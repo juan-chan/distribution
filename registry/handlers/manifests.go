@@ -7,6 +7,10 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gorilla/handlers"
+	"github.com/opencontainers/go-digest"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/docker/distribution"
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/manifest/manifestlist"
@@ -17,9 +21,7 @@ import (
 	"github.com/docker/distribution/registry/api/errcode"
 	v2 "github.com/docker/distribution/registry/api/v2"
 	"github.com/docker/distribution/registry/auth"
-	"github.com/gorilla/handlers"
-	"github.com/opencontainers/go-digest"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/docker/distribution/registry/auth/authserver"
 )
 
 // These constants determine which architecture and OS to choose from a
@@ -129,6 +131,25 @@ func (imh *manifestHandler) GetManifest(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		imh.Digest = desc.Digest
+
+		// validate is current tag forbidden
+		host := dcontext.GetStringValue(imh, "http.request.host")
+		repo := imh.Repository.Named().Name()
+		resp, err := authserver.IsImageForbidden(imh.grpcConnPool, imh.authserver, host, repo, imh.Tag)
+		if err != nil {
+			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+			return
+		}
+
+		if !resp.GetOk() {
+			imh.Errors = append(imh.Errors, errcode.ErrorCodeDenied.WithMessage(resp.GetMsg()))
+			return
+		}
+
+		if resp.GetForbidden() {
+			imh.Errors = append(imh.Errors, errcode.ErrorCodeDenied.WithMessage(resp.GetForbiddenNote()))
+			return
+		}
 	}
 
 	if etagMatch(r, imh.Digest.String()) {
@@ -339,6 +360,32 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Tag this manifest
+	if imh.Tag != "" {
+		authServerAddress := imh.authserver
+		host := dcontext.GetStringValue(imh, "http.request.host")
+		repo := imh.Repository.Named().Name()
+		tag := imh.Tag
+		checkTagResp, err := authserver.CheckTag(imh.grpcConnPool, authServerAddress, host, repo, tag)
+		if err != nil {
+			dcontext.GetLogger(imh).Errorf("fail to check tag [auth_server_address=%v, host=%v, repo=%v, tag=%v]: %v", authServerAddress, host, repo, tag, err)
+			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown)
+			return
+		}
+		if !checkTagResp.Ok {
+			imh.Errors = append(imh.Errors, errcode.ErrorCodeDenied.WithMessage(checkTagResp.ErrorMsg))
+			return
+		}
+
+		tags := imh.Repository.Tags(imh)
+		err = tags.Tag(imh, imh.Tag, desc)
+		if err != nil {
+			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
+			return
+		}
+
+	}
+
 	_, err = manifests.Put(imh, manifest, options...)
 	if err != nil {
 		// TODO(stevvooe): These error handling switches really need to be
@@ -375,17 +422,6 @@ func (imh *manifestHandler) PutManifest(w http.ResponseWriter, r *http.Request) 
 			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
 		}
 		return
-	}
-
-	// Tag this manifest
-	if imh.Tag != "" {
-		tags := imh.Repository.Tags(imh)
-		err = tags.Tag(imh, imh.Tag, desc)
-		if err != nil {
-			imh.Errors = append(imh.Errors, errcode.ErrorCodeUnknown.WithDetail(err))
-			return
-		}
-
 	}
 
 	// Construct a canonical url for the uploaded manifest.

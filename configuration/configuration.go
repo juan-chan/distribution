@@ -57,6 +57,8 @@ type Configuration struct {
 	// used to gate requests.
 	Auth Auth `yaml:"auth,omitempty"`
 
+	AuthServer string `yaml:"authserver,omitempty"`
+
 	// Middleware lists all middlewares to be used by the registry.
 	Middleware map[string][]Middleware `yaml:"middleware,omitempty"`
 

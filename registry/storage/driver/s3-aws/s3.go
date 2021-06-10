@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
+	"path"
 	"reflect"
 	"sort"
 	"strconv"
@@ -38,9 +39,11 @@ import (
 
 	dcontext "github.com/docker/distribution/context"
 	"github.com/docker/distribution/registry/client/transport"
+	"github.com/docker/distribution/registry/grpc"
 	storagedriver "github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/registry/storage/driver/base"
 	"github.com/docker/distribution/registry/storage/driver/factory"
+	"github.com/docker/distribution/registry/storage/manager"
 )
 
 const driverName = "s3aws"
@@ -82,7 +85,7 @@ var validRegions = map[string]struct{}{}
 // validObjectACLs contains known s3 object Acls
 var validObjectACLs = map[string]struct{}{}
 
-//DriverParameters A struct that encapsulates all of the driver parameters after all values have been set
+// DriverParameters A struct that encapsulates all of the driver parameters after all values have been set
 type DriverParameters struct {
 	AccessKey                   string
 	SecretKey                   string
@@ -103,6 +106,7 @@ type DriverParameters struct {
 	UserAgent                   string
 	ObjectACL                   string
 	SessionToken                string
+	StorageManagerAddress       string
 }
 
 func init() {
@@ -149,6 +153,10 @@ type driver struct {
 	RootDirectory               string
 	StorageClass                string
 	ObjectACL                   string
+	StorageManagerAddress       string
+
+	// grpcConnPool is a gRPC client connection pool.
+	grpcConnPool *grpc.ConnPool
 }
 
 type baseEmbed struct {
@@ -341,6 +349,9 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 
 	sessionToken := ""
 
+	// storage-manager gRPC server addr
+	storageManagerAddress := parameters["smaddress"]
+
 	params := DriverParameters{
 		fmt.Sprint(accessKey),
 		fmt.Sprint(secretKey),
@@ -361,6 +372,7 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		fmt.Sprint(userAgent),
 		objectACL,
 		fmt.Sprint(sessionToken),
+		fmt.Sprint(storageManagerAddress),
 	}
 
 	return New(params)
@@ -487,6 +499,9 @@ func New(params DriverParameters) (*Driver, error) {
 		RootDirectory:               params.RootDirectory,
 		StorageClass:                params.StorageClass,
 		ObjectACL:                   params.ObjectACL,
+		StorageManagerAddress:       params.StorageManagerAddress,
+
+		grpcConnPool: grpc.NewConnPool(),
 	}
 
 	return &Driver{
@@ -515,9 +530,14 @@ func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 
 // PutContent stores the []byte content at a location designated by "path".
 func (d *driver) PutContent(ctx context.Context, path string, contents []byte) error {
-	_, err := d.S3.PutObject(&s3.PutObjectInput{
+	storagePath, err := d.storagePath(path, ctx)
+	if err != nil {
+		return err
+	}
+
+	_, err = d.S3.PutObject(&s3.PutObjectInput{
 		Bucket:               aws.String(d.Bucket),
-		Key:                  aws.String(d.s3Path(path)),
+		Key:                  aws.String(storagePath),
 		ContentType:          d.getContentType(),
 		ACL:                  d.getACL(),
 		ServerSideEncryption: d.getEncryptionMode(),
@@ -525,15 +545,20 @@ func (d *driver) PutContent(ctx context.Context, path string, contents []byte) e
 		StorageClass:         d.getStorageClass(),
 		Body:                 bytes.NewReader(contents),
 	})
-	return parseError(path, err)
+	return parseError(storagePath, err)
 }
 
 // Reader retrieves an io.ReadCloser for the content stored at "path" with a
 // given byte offset.
 func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.ReadCloser, error) {
+	storagePath, err := d.storagePath(path, ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := d.S3.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(d.Bucket),
-		Key:    aws.String(d.s3Path(path)),
+		Key:    aws.String(storagePath),
 		Range:  aws.String("bytes=" + strconv.FormatInt(offset, 10) + "-"),
 	})
 
@@ -542,7 +567,7 @@ func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.Read
 			return ioutil.NopCloser(bytes.NewReader(nil)), nil
 		}
 
-		return nil, parseError(path, err)
+		return nil, parseError(storagePath, err)
 	}
 	return resp.Body, nil
 }
@@ -550,7 +575,12 @@ func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.Read
 // Writer returns a FileWriter which will store the content written to it
 // at the location designated by "path" after the call to Commit.
 func (d *driver) Writer(ctx context.Context, path string, append bool) (storagedriver.FileWriter, error) {
-	key := d.s3Path(path)
+	storagePath, err := d.storagePath(path, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	key := storagePath
 	if !append {
 		// TODO (brianbland): cancel other uploads at this path
 		resp, err := d.S3.CreateMultipartUpload(&s3.CreateMultipartUploadInput{
@@ -572,7 +602,7 @@ func (d *driver) Writer(ctx context.Context, path string, append bool) (storaged
 		Prefix: aws.String(key),
 	})
 	if err != nil {
-		return nil, parseError(path, err)
+		return nil, parseError(storagePath, err)
 	}
 
 	for _, multi := range resp.Uploads {
@@ -585,7 +615,7 @@ func (d *driver) Writer(ctx context.Context, path string, append bool) (storaged
 			UploadId: multi.UploadId,
 		})
 		if err != nil {
-			return nil, parseError(path, err)
+			return nil, parseError(storagePath, err)
 		}
 		var multiSize int64
 		for _, part := range resp.Parts {
@@ -593,15 +623,20 @@ func (d *driver) Writer(ctx context.Context, path string, append bool) (storaged
 		}
 		return d.newWriter(key, *multi.UploadId, resp.Parts), nil
 	}
-	return nil, storagedriver.PathNotFoundError{Path: path}
+	return nil, storagedriver.PathNotFoundError{Path: storagePath}
 }
 
 // Stat retrieves the FileInfo for the given path, including the current size
 // in bytes and the creation time.
 func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo, error) {
+	storagePath, err := d.storagePath(path, ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := d.S3.ListObjects(&s3.ListObjectsInput{
 		Bucket:  aws.String(d.Bucket),
-		Prefix:  aws.String(d.s3Path(path)),
+		Prefix:  aws.String(storagePath),
 		MaxKeys: aws.Int64(1),
 	})
 	if err != nil {
@@ -613,7 +648,7 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 	}
 
 	if len(resp.Contents) == 1 {
-		if *resp.Contents[0].Key != d.s3Path(path) {
+		if *resp.Contents[0].Key != storagePath {
 			fi.IsDir = true
 		} else {
 			fi.IsDir = false
@@ -623,7 +658,7 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 	} else if len(resp.CommonPrefixes) == 1 {
 		fi.IsDir = true
 	} else {
-		return nil, storagedriver.PathNotFoundError{Path: path}
+		return nil, storagedriver.PathNotFoundError{Path: storagePath}
 	}
 
 	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
@@ -636,22 +671,30 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 		path = path + "/"
 	}
 
-	// This is to cover for the cases when the rootDirectory of the driver is either "" or "/".
-	// In those cases, there is no root prefix to replace and we must actually add a "/" to all
-	// results in order to keep them as valid paths as recognized by storagedriver.PathRegexp
-	prefix := ""
-	if d.s3Path("") == "" {
-		prefix = "/"
+	storagePath, err := d.storagePath(path, ctx)
+	if err != nil {
+		return nil, err
+	}
+	if storagePath != "/" && storagePath[len(storagePath)-1] != '/' {
+		storagePath = storagePath + "/"
+	}
+
+	pathPrefix, storagePathPrefix := findPrefixes(path, storagePath)
+	if pathPrefix == "" {
+		pathPrefix = "/"
+	}
+	if storagePathPrefix == "" {
+		storagePathPrefix = "/"
 	}
 
 	resp, err := d.S3.ListObjects(&s3.ListObjectsInput{
 		Bucket:    aws.String(d.Bucket),
-		Prefix:    aws.String(d.s3Path(path)),
+		Prefix:    aws.String(storagePath),
 		Delimiter: aws.String("/"),
 		MaxKeys:   aws.Int64(listMax),
 	})
 	if err != nil {
-		return nil, parseError(opath, err)
+		return nil, parseError(storagePath, err)
 	}
 
 	files := []string{}
@@ -659,18 +702,18 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 
 	for {
 		for _, key := range resp.Contents {
-			files = append(files, strings.Replace(*key.Key, d.s3Path(""), prefix, 1))
+			files = append(files, strings.Replace(*key.Key, storagePathPrefix, pathPrefix, 1))
 		}
 
 		for _, commonPrefix := range resp.CommonPrefixes {
 			commonPrefix := *commonPrefix.Prefix
-			directories = append(directories, strings.Replace(commonPrefix[0:len(commonPrefix)-1], d.s3Path(""), prefix, 1))
+			directories = append(directories, strings.Replace(commonPrefix[0:len(commonPrefix)-1], storagePathPrefix, pathPrefix, 1))
 		}
 
 		if *resp.IsTruncated {
 			resp, err = d.S3.ListObjects(&s3.ListObjectsInput{
 				Bucket:    aws.String(d.Bucket),
-				Prefix:    aws.String(d.s3Path(path)),
+				Prefix:    aws.String(storagePath),
 				Delimiter: aws.String("/"),
 				MaxKeys:   aws.Int64(listMax),
 				Marker:    resp.NextMarker,
@@ -687,7 +730,7 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 		if len(files) == 0 && len(directories) == 0 {
 			// Treat empty response as missing directory, since we don't actually
 			// have directories in s3.
-			return nil, storagedriver.PathNotFoundError{Path: opath}
+			return nil, storagedriver.PathNotFoundError{Path: storagePath}
 		}
 	}
 
@@ -706,6 +749,15 @@ func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) e
 
 // copy copies an object stored at sourcePath to destPath.
 func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) error {
+	sourceStoragePath, err := d.storagePath(sourcePath, ctx)
+	if err != nil {
+		return err
+	}
+	destStoragePath, err := d.storagePath(destPath, ctx)
+	if err != nil {
+		return err
+	}
+
 	// S3 can copy objects up to 5 GB in size with a single PUT Object - Copy
 	// operation. For larger objects, the multipart upload API must be used.
 	//
@@ -714,29 +766,29 @@ func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) e
 
 	fileInfo, err := d.Stat(ctx, sourcePath)
 	if err != nil {
-		return parseError(sourcePath, err)
+		return parseError(sourceStoragePath, err)
 	}
 
 	if fileInfo.Size() <= d.MultipartCopyThresholdSize {
 		_, err := d.S3.CopyObject(&s3.CopyObjectInput{
 			Bucket:               aws.String(d.Bucket),
-			Key:                  aws.String(d.s3Path(destPath)),
+			Key:                  aws.String(destStoragePath),
 			ContentType:          d.getContentType(),
 			ACL:                  d.getACL(),
 			ServerSideEncryption: d.getEncryptionMode(),
 			SSEKMSKeyId:          d.getSSEKMSKeyID(),
 			StorageClass:         d.getStorageClass(),
-			CopySource:           aws.String(d.Bucket + "/" + d.s3Path(sourcePath)),
+			CopySource:           aws.String(d.Bucket + "/" + sourceStoragePath),
 		})
 		if err != nil {
-			return parseError(sourcePath, err)
+			return parseError(sourceStoragePath, err)
 		}
 		return nil
 	}
 
 	createResp, err := d.S3.CreateMultipartUpload(&s3.CreateMultipartUploadInput{
 		Bucket:               aws.String(d.Bucket),
-		Key:                  aws.String(d.s3Path(destPath)),
+		Key:                  aws.String(destStoragePath),
 		ContentType:          d.getContentType(),
 		ACL:                  d.getACL(),
 		SSEKMSKeyId:          d.getSSEKMSKeyID(),
@@ -763,8 +815,8 @@ func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) e
 			}
 			uploadResp, err := d.S3.UploadPartCopy(&s3.UploadPartCopyInput{
 				Bucket:          aws.String(d.Bucket),
-				CopySource:      aws.String(d.Bucket + "/" + d.s3Path(sourcePath)),
-				Key:             aws.String(d.s3Path(destPath)),
+				CopySource:      aws.String(d.Bucket + "/" + sourceStoragePath),
+				Key:             aws.String(destStoragePath),
 				PartNumber:      aws.Int64(i + 1),
 				UploadId:        createResp.UploadId,
 				CopySourceRange: aws.String(fmt.Sprintf("bytes=%d-%d", firstByte, lastByte)),
@@ -789,7 +841,7 @@ func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) e
 
 	_, err = d.S3.CompleteMultipartUpload(&s3.CompleteMultipartUploadInput{
 		Bucket:          aws.String(d.Bucket),
-		Key:             aws.String(d.s3Path(destPath)),
+		Key:             aws.String(destStoragePath),
 		UploadId:        createResp.UploadId,
 		MultipartUpload: &s3.CompletedMultipartUpload{Parts: completedParts},
 	})
@@ -806,8 +858,13 @@ func min(a, b int) int {
 // Delete recursively deletes all objects stored at "path" and its subpaths.
 // We must be careful since S3 does not guarantee read after delete consistency
 func (d *driver) Delete(ctx context.Context, path string) error {
+	storagePath, err := d.storagePath(path, ctx)
+	if err != nil {
+		return err
+	}
+
 	s3Objects := make([]*s3.ObjectIdentifier, 0, listMax)
-	s3Path := d.s3Path(path)
+	s3Path := storagePath
 	listObjectsInput := &s3.ListObjectsInput{
 		Bucket: aws.String(d.Bucket),
 		Prefix: aws.String(s3Path),
@@ -821,7 +878,7 @@ ListLoop:
 		// if there were no more results to return after the first call, resp.IsTruncated would have been false
 		// and the loop would be exited without recalling ListObjects
 		if err != nil || len(resp.Contents) == 0 {
-			return storagedriver.PathNotFoundError{Path: path}
+			return storagedriver.PathNotFoundError{Path: storagePath}
 		}
 
 		for _, key := range resp.Contents {
@@ -864,6 +921,11 @@ ListLoop:
 // URLFor returns a URL which may be used to retrieve the content stored at the given path.
 // May return an UnsupportedMethodErr in certain StorageDriver implementations.
 func (d *driver) URLFor(ctx context.Context, path string, options map[string]interface{}) (string, error) {
+	storagePath, err := d.storagePath(path, ctx)
+	if err != nil {
+		return "", err
+	}
+
 	methodString := "GET"
 	method, ok := options["method"]
 	if ok {
@@ -888,12 +950,12 @@ func (d *driver) URLFor(ctx context.Context, path string, options map[string]int
 	case "GET":
 		req, _ = d.S3.GetObjectRequest(&s3.GetObjectInput{
 			Bucket: aws.String(d.Bucket),
-			Key:    aws.String(d.s3Path(path)),
+			Key:    aws.String(storagePath),
 		})
 	case "HEAD":
 		req, _ = d.S3.HeadObjectRequest(&s3.HeadObjectInput{
 			Bucket: aws.String(d.Bucket),
-			Key:    aws.String(d.s3Path(path)),
+			Key:    aws.String(storagePath),
 		})
 	default:
 		panic("unreachable")
@@ -905,27 +967,7 @@ func (d *driver) URLFor(ctx context.Context, path string, options map[string]int
 // Walk traverses a filesystem defined within driver, starting
 // from the given path, calling f on each file
 func (d *driver) Walk(ctx context.Context, from string, f storagedriver.WalkFn) error {
-	path := from
-	if !strings.HasSuffix(path, "/") {
-		path = path + "/"
-	}
-
-	prefix := ""
-	if d.s3Path("") == "" {
-		prefix = "/"
-	}
-
-	var objectCount int64
-	if err := d.doWalk(ctx, &objectCount, d.s3Path(path), prefix, f); err != nil {
-		return err
-	}
-
-	// S3 doesn't have the concept of empty directories, so it'll return path not found if there are no objects
-	if objectCount == 0 {
-		return storagedriver.PathNotFoundError{Path: from}
-	}
-
-	return nil
+	return storagedriver.WalkFallback(ctx, d, from, f)
 }
 
 type walkInfoContainer struct {
@@ -1090,6 +1132,35 @@ func (d *driver) getStorageClass() *string {
 		return nil
 	}
 	return aws.String(d.StorageClass)
+}
+
+func (d *driver) resolvePath(before, after string) string {
+	after = path.Join(d.RootDirectory, after)
+	after = strings.TrimLeft(after, "/")
+	return strings.TrimRight(after, "/")
+}
+
+func (d *driver) storagePath(subPath string, ctx context.Context) (string, error) {
+	if d.StorageManagerAddress != "" {
+		storagePath, err := manager.GetStoragePath(d.grpcConnPool,
+			d.StorageManagerAddress,
+			dcontext.GetStringValue(ctx, "http.request.host"),
+			subPath)
+		if err != nil {
+			return "", fmt.Errorf("get storage path failed: %v", err)
+		}
+		return d.resolvePath(subPath, storagePath), nil
+	}
+	return d.resolvePath(subPath, path.Join(subPath)), nil
+}
+
+func findPrefixes(path, storagePath string) (string, string) {
+	for i, j := len(path)-1, len(storagePath)-1; i >= 0 && j >= 0; i, j = i-1, j-1 {
+		if path[i] != storagePath[j] {
+			return path[:i+1], storagePath[:j+1]
+		}
+	}
+	return "", ""
 }
 
 // writer attempts to upload parts to S3 in a buffered fashion where the last
