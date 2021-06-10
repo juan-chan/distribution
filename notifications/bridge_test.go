@@ -3,11 +3,11 @@ package notifications
 import (
 	"testing"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/manifest/schema1"
-	"github.com/docker/distribution/reference"
-	v2 "github.com/docker/distribution/registry/api/v2"
-	"github.com/docker/distribution/uuid"
+	"github.com/juan-chan/distribution"
+	"github.com/juan-chan/distribution/manifest/schema1"
+	"github.com/juan-chan/distribution/reference"
+	v2 "github.com/juan-chan/distribution/registry/api/v2"
+	"github.com/juan-chan/distribution/uuid"
 	events "github.com/docker/go-events"
 	"github.com/docker/libtrust"
 	"github.com/opencontainers/go-digest"

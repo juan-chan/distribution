@@ -8,8 +8,8 @@ import (
 	mrand "math/rand"
 	"time"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
+	"github.com/juan-chan/distribution"
+	"github.com/juan-chan/distribution/context"
 	"github.com/opencontainers/go-digest"
 )
 

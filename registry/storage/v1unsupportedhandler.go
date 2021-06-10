@@ -3,7 +3,7 @@ package storage
 import (
 	"context"
 
-	"github.com/docker/distribution"
+	"github.com/juan-chan/distribution"
 	digest "github.com/opencontainers/go-digest"
 )
 

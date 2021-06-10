@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/distribution/registry/storage/cache/cachecheck"
+	"github.com/juan-chan/distribution/registry/storage/cache/cachecheck"
 	"github.com/garyburd/redigo/redis"
 )
 

@@ -4,11 +4,11 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/manifest"
-	"github.com/docker/distribution/manifest/schema2"
-	"github.com/docker/distribution/registry/storage/driver/inmemory"
+	"github.com/juan-chan/distribution"
+	"github.com/juan-chan/distribution/context"
+	"github.com/juan-chan/distribution/manifest"
+	"github.com/juan-chan/distribution/manifest/schema2"
+	"github.com/juan-chan/distribution/registry/storage/driver/inmemory"
 )
 
 func TestVerifyManifestForeignLayer(t *testing.T) {

@@ -3,7 +3,7 @@ package proxy
 import (
 	"context"
 
-	"github.com/docker/distribution"
+	"github.com/juan-chan/distribution"
 )
 
 // proxyTagService supports local and remote lookup of tags.

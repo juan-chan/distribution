@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/docker/distribution"
+	"github.com/juan-chan/distribution"
 	"github.com/opencontainers/go-digest"
 )
 

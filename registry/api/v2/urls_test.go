@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/docker/distribution/reference"
+	"github.com/juan-chan/distribution/reference"
 )
 
 type urlBuilderTestCase struct {

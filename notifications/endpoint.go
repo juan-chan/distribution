@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/docker/distribution/configuration"
+	"github.com/juan-chan/distribution/configuration"
 	events "github.com/docker/go-events"
 )
 

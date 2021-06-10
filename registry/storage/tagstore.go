@@ -4,8 +4,8 @@ import (
 	"context"
 	"path"
 
-	"github.com/docker/distribution"
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
+	"github.com/juan-chan/distribution"
+	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
 	"github.com/opencontainers/go-digest"
 )
 

@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/uuid"
+	"github.com/juan-chan/distribution"
+	"github.com/juan-chan/distribution/context"
+	"github.com/juan-chan/distribution/reference"
+	"github.com/juan-chan/distribution/uuid"
 	events "github.com/docker/go-events"
 	"github.com/opencontainers/go-digest"
 )

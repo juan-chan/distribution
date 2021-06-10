@@ -13,9 +13,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 
-	"github.com/docker/distribution/context"
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
-	"github.com/docker/distribution/registry/storage/driver/testsuites"
+	"github.com/juan-chan/distribution/context"
+	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
+	"github.com/juan-chan/distribution/registry/storage/driver/testsuites"
 )
 
 // Hook up gocheck into the "go test" runner.

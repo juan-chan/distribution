@@ -82,6 +82,12 @@ type Parser struct {
 // NewParser returns a *Parser with the given environment prefix which handles
 // versioned configurations which match the given parseInfos
 func NewParser(prefix string, parseInfos []VersionedParseInfo) *Parser {
+	// Set time format
+	logrus.SetFormatter(&logrus.TextFormatter{
+		TimestampFormat: "2006-01-02 15:04:05.000",
+		FullTimestamp:   true,
+	})
+
 	p := Parser{prefix: prefix, mapping: make(map[Version]VersionedParseInfo)}
 
 	for _, parseInfo := range parseInfos {

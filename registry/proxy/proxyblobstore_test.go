@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/registry/proxy/scheduler"
-	"github.com/docker/distribution/registry/storage"
-	"github.com/docker/distribution/registry/storage/cache/memory"
-	"github.com/docker/distribution/registry/storage/driver/filesystem"
-	"github.com/docker/distribution/registry/storage/driver/inmemory"
+	"github.com/juan-chan/distribution"
+	"github.com/juan-chan/distribution/reference"
+	"github.com/juan-chan/distribution/registry/proxy/scheduler"
+	"github.com/juan-chan/distribution/registry/storage"
+	"github.com/juan-chan/distribution/registry/storage/cache/memory"
+	"github.com/juan-chan/distribution/registry/storage/driver/filesystem"
+	"github.com/juan-chan/distribution/registry/storage/driver/inmemory"
 	"github.com/opencontainers/go-digest"
 )
 

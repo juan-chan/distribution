@@ -15,27 +15,28 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/configuration"
-	dcontext "github.com/docker/distribution/context"
-	"github.com/docker/distribution/health"
-	"github.com/docker/distribution/health/checks"
-	prometheus "github.com/docker/distribution/metrics"
-	"github.com/docker/distribution/notifications"
-	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/registry/api/errcode"
-	v2 "github.com/docker/distribution/registry/api/v2"
-	"github.com/docker/distribution/registry/auth"
-	registrymiddleware "github.com/docker/distribution/registry/middleware/registry"
-	repositorymiddleware "github.com/docker/distribution/registry/middleware/repository"
-	"github.com/docker/distribution/registry/proxy"
-	"github.com/docker/distribution/registry/storage"
-	memorycache "github.com/docker/distribution/registry/storage/cache/memory"
-	rediscache "github.com/docker/distribution/registry/storage/cache/redis"
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
-	"github.com/docker/distribution/registry/storage/driver/factory"
-	storagemiddleware "github.com/docker/distribution/registry/storage/driver/middleware"
-	"github.com/docker/distribution/version"
+	"github.com/juan-chan/distribution"
+	"github.com/juan-chan/distribution/configuration"
+	dcontext "github.com/juan-chan/distribution/context"
+	"github.com/juan-chan/distribution/health"
+	"github.com/juan-chan/distribution/health/checks"
+	prometheus "github.com/juan-chan/distribution/metrics"
+	"github.com/juan-chan/distribution/notifications"
+	"github.com/juan-chan/distribution/reference"
+	"github.com/juan-chan/distribution/registry/api/errcode"
+	v2 "github.com/juan-chan/distribution/registry/api/v2"
+	"github.com/juan-chan/distribution/registry/auth"
+	"github.com/juan-chan/distribution/registry/grpc"
+	registrymiddleware "github.com/juan-chan/distribution/registry/middleware/registry"
+	repositorymiddleware "github.com/juan-chan/distribution/registry/middleware/repository"
+	"github.com/juan-chan/distribution/registry/proxy"
+	"github.com/juan-chan/distribution/registry/storage"
+	memorycache "github.com/juan-chan/distribution/registry/storage/cache/memory"
+	rediscache "github.com/juan-chan/distribution/registry/storage/cache/redis"
+	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
+	"github.com/juan-chan/distribution/registry/storage/driver/factory"
+	storagemiddleware "github.com/juan-chan/distribution/registry/storage/driver/middleware"
+	"github.com/juan-chan/distribution/version"
 	events "github.com/docker/go-events"
 	"github.com/docker/go-metrics"
 	"github.com/docker/libtrust"
@@ -87,12 +88,23 @@ type App struct {
 
 	// readOnly is true if the registry is in a read-only maintenance mode
 	readOnly bool
+
+	authserver string
+
+	// grpcConnPool is a gRPC client connection pool.
+	grpcConnPool *grpc.ConnPool
 }
 
 // NewApp takes a configuration and returns a configured app, ready to serve
 // requests. The app only implements ServeHTTP and can be wrapped in other
 // handlers accordingly.
 func NewApp(ctx context.Context, config *configuration.Configuration) *App {
+	// Set time format
+	logrus.SetFormatter(&logrus.TextFormatter{
+		TimestampFormat: "2006-01-02 15:04:05.000",
+		FullTimestamp:   true,
+	})
+
 	app := &App{
 		Config:  config,
 		Context: ctx,
@@ -160,6 +172,7 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 	app.configureEvents(config)
 	app.configureRedis(config)
 	app.configureLogHook(config)
+	app.configureGrpcConnPool()
 
 	options := registrymiddleware.GetRegistryOptions()
 	if config.Compatibility.Schema1.TrustKey != "" {
@@ -331,6 +344,8 @@ func NewApp(ctx context.Context, config *configuration.Configuration) *App {
 	if !ok {
 		dcontext.GetLogger(app).Warnf("Registry does not implement RepositoryRemover. Will not be able to delete repos and tags")
 	}
+
+	app.authserver = config.AuthServer
 
 	return app
 }
@@ -617,6 +632,11 @@ func (app *App) configureSecret(configuration *configuration.Configuration) {
 		configuration.HTTP.Secret = string(secretBytes[:])
 		dcontext.GetLogger(app).Warn("No HTTP secret provided - generated random secret. This may cause problems with uploads if multiple registries are behind a load-balancer. To provide a shared secret, fill in http.secret in the configuration file or set the REGISTRY_HTTP_SECRET environment variable.")
 	}
+}
+
+// configureGrpcConnPool creates a default gRPC client connection pool.
+func (app *App) configureGrpcConnPool() {
+	app.grpcConnPool = grpc.NewConnPool()
 }
 
 func (app *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {

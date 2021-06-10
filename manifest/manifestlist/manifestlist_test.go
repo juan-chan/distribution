@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/docker/distribution"
+	"github.com/juan-chan/distribution"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

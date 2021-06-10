@@ -11,11 +11,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/registry/storage/cache/memory"
-	"github.com/docker/distribution/registry/storage/driver/testdriver"
-	"github.com/docker/distribution/testutil"
+	"github.com/juan-chan/distribution"
+	"github.com/juan-chan/distribution/reference"
+	"github.com/juan-chan/distribution/registry/storage/cache/memory"
+	"github.com/juan-chan/distribution/registry/storage/driver/testdriver"
+	"github.com/juan-chan/distribution/testutil"
 	"github.com/opencontainers/go-digest"
 )
 

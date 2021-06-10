@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"sync"
 
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
+	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
 )
 
 type regulator struct {

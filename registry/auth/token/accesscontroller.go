@@ -1,6 +1,7 @@
 package token
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/x509"
@@ -11,9 +12,10 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"text/template"
 
-	dcontext "github.com/docker/distribution/context"
-	"github.com/docker/distribution/registry/auth"
+	dcontext "github.com/juan-chan/distribution/context"
+	"github.com/juan-chan/distribution/registry/auth"
 	"github.com/docker/libtrust"
 )
 
@@ -99,13 +101,25 @@ func (ac authChallenge) Status() int {
 // the WWW-Authenticate response challenge header.
 // See https://tools.ietf.org/html/rfc6750#section-3
 func (ac authChallenge) challengeParams(r *http.Request) string {
-	var realm string
+	var realm, str string
 	if ac.autoRedirect {
 		realm = fmt.Sprintf("https://%s/auth/token", r.Host)
 	} else {
 		realm = ac.realm
 	}
-	str := fmt.Sprintf("Bearer realm=%q,service=%q", realm, ac.service)
+
+	t := template.Must(template.New("realm").Parse(realm))
+
+	var parsedRealm bytes.Buffer
+
+	err := t.Execute(&parsedRealm, map[string]string{"Host": r.Host})
+
+	if err != nil {
+		fmt.Println("[ERROR] execute token realm template error: %s", err)
+		str = fmt.Sprintf("Bearer realm=%q,service=%q", realm, ac.service)
+	} else {
+		str = fmt.Sprintf("Bearer realm=%q,service=%q", parsedRealm.String(), ac.service)
+	}
 
 	if scope := ac.accessSet.scopeParam(); scope != "" {
 		str = fmt.Sprintf("%s,scope=%q", str, scope)

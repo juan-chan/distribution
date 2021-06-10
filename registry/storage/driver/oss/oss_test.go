@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	alioss "github.com/denverdino/aliyungo/oss"
-	"github.com/docker/distribution/context"
-	storagedriver "github.com/docker/distribution/registry/storage/driver"
-	"github.com/docker/distribution/registry/storage/driver/testsuites"
+	"github.com/juan-chan/distribution/context"
+	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
+	"github.com/juan-chan/distribution/registry/storage/driver/testsuites"
 	"gopkg.in/check.v1"
 )
 

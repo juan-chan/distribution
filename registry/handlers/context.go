@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/docker/distribution"
-	dcontext "github.com/docker/distribution/context"
-	"github.com/docker/distribution/registry/api/errcode"
-	v2 "github.com/docker/distribution/registry/api/v2"
-	"github.com/docker/distribution/registry/auth"
+	"github.com/juan-chan/distribution"
+	dcontext "github.com/juan-chan/distribution/context"
+	"github.com/juan-chan/distribution/registry/api/errcode"
+	v2 "github.com/juan-chan/distribution/registry/api/v2"
+	"github.com/juan-chan/distribution/registry/auth"
 	"github.com/opencontainers/go-digest"
 )
 

@@ -3,7 +3,7 @@ package v2
 import (
 	"net/http"
 
-	"github.com/docker/distribution/registry/api/errcode"
+	"github.com/juan-chan/distribution/registry/api/errcode"
 )
 
 const errGroup = "registry.api.v2"

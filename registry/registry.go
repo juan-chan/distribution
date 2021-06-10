@@ -24,13 +24,13 @@ import (
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 
-	"github.com/docker/distribution/configuration"
-	dcontext "github.com/docker/distribution/context"
-	"github.com/docker/distribution/health"
-	"github.com/docker/distribution/registry/handlers"
-	"github.com/docker/distribution/registry/listener"
-	"github.com/docker/distribution/uuid"
-	"github.com/docker/distribution/version"
+	"github.com/juan-chan/distribution/configuration"
+	dcontext "github.com/juan-chan/distribution/context"
+	"github.com/juan-chan/distribution/health"
+	"github.com/juan-chan/distribution/registry/handlers"
+	"github.com/juan-chan/distribution/registry/listener"
+	"github.com/juan-chan/distribution/uuid"
+	"github.com/juan-chan/distribution/version"
 )
 
 // this channel gets notified when process receives signal. It is global to ease unit testing

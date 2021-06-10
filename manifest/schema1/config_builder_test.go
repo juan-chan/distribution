@@ -8,9 +8,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/docker/distribution"
-	dcontext "github.com/docker/distribution/context"
-	"github.com/docker/distribution/reference"
+	"github.com/juan-chan/distribution"
+	dcontext "github.com/juan-chan/distribution/context"
+	"github.com/juan-chan/distribution/reference"
 	"github.com/docker/libtrust"
 	"github.com/opencontainers/go-digest"
 )

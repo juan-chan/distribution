@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/registry/storage/driver"
+	"github.com/juan-chan/distribution"
+	"github.com/juan-chan/distribution/reference"
+	"github.com/juan-chan/distribution/registry/storage/driver"
 	"github.com/opencontainers/go-digest"
 )
 

@@ -6,8 +6,8 @@ import (
 	mrand "math/rand"
 	"testing"
 
-	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/registry/storage/driver/inmemory"
+	"github.com/juan-chan/distribution/context"
+	"github.com/juan-chan/distribution/registry/storage/driver/inmemory"
 	"github.com/opencontainers/go-digest"
 )
 

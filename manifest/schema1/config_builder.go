@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/manifest"
-	"github.com/docker/distribution/reference"
+	"github.com/juan-chan/distribution"
+	"github.com/juan-chan/distribution/manifest"
+	"github.com/juan-chan/distribution/reference"
 	"github.com/docker/libtrust"
 	"github.com/opencontainers/go-digest"
 )

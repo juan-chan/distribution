@@ -5,10 +5,10 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/manifest"
-	"github.com/docker/distribution/manifest/ocischema"
-	"github.com/docker/distribution/registry/storage/driver/inmemory"
+	"github.com/juan-chan/distribution"
+	"github.com/juan-chan/distribution/manifest"
+	"github.com/juan-chan/distribution/manifest/ocischema"
+	"github.com/juan-chan/distribution/registry/storage/driver/inmemory"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

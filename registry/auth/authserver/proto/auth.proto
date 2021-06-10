@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package proto;
+
+service ArtAuth {
+    rpc DockerCreateJWT (DockerCreateJWTRequest) returns (DockerCreateJWTResponse) {
+    }
+    rpc CheckAuth (CheckAuthRequest) returns (ArtAuthResponse) {
+    }
+    rpc CreateJWT (CreateJWTRequest) returns (CreateJWTResponse) {
+    }
+    rpc DockerCheckTag (DockerCheckTagRequest) returns (DockerCheckTagResponse) {
+    }
+    // 判断指定的 Docker 镜像版本是否已被禁止拉取
+    rpc IsDockerImageForbidden (IsDockerImageForbiddenRequest) returns (IsDockerImageForbiddenResponse);
+}
+
+enum NPMActions {
+    INSTALL = 0;
+    PUBLISH = 1;
+    UN_PUBLISH = 2;
+}
+
+message DockerCreateJWTRequest {
+    uint32 user_id = 1;
+    string package_path = 2;
+    string actions = 3;
+}
+
+message DockerCreateJWTResponse {
+    bool result = 1;
+    string token = 2;
+    string message = 3;
+}
+
+enum ArtAction {
+    PULL = 0;
+    PUSH = 1;
+    DELETE = 2;
+}
+
+message CheckAuthRequest {
+    int32 artifact_type = 1;
+    ArtAction action = 2;
+    string authorization_header = 3;
+    string host = 4;
+    string path = 5;
+    string addr = 6;
+    string userAgent = 7;
+    string pkg = 8;
+    string version = 9;
+}
+
+message ArtAuthResponse {
+    bool result = 1;
+    int32 result_code = 2;
+    string error_msg = 3;
+    uint32 user_id = 4;
+    string user_name = 5;
+}
+
+message CreateJWTRequest {
+    int32 artifact_type = 1;
+    uint32 user_id = 2;
+    string pkg_path = 3;
+    string authorization = 4;
+    string host = 5;
+    // 有效期 单位：秒 大于 0 有效
+    int64 expiration = 6;
+}
+
+message CreateJWTResponse {
+    bool result = 1;
+    int32 result_code = 2;
+    string token = 3;
+    string message = 4;
+}
+
+message DockerCheckTagRequest {
+    string host = 1;
+    string repo = 2;
+    string tag = 3;
+}
+
+message DockerCheckTagResponse {
+    bool ok = 1;
+    string error_msg = 2;
+}
+
+message IsDockerImageForbiddenRequest {
+    // docker registry host
+    string host = 1;
+    // docker repository name. e.g., project/repo/hello-world
+    string repo = 2;
+    // docker image tag
+    string tag = 3;
+}
+
+message IsDockerImageForbiddenResponse {
+    // 接口调用是否成功，是则返回 true，否则返回 false
+    bool ok = 1;
+    // ok 为 false 时带上的异常信息
+    string msg = 2;
+    // ok 为成功时有意义，表明当前 TAG 的 Docker 镜像是否已被禁止下载
+    bool forbidden = 3;
+    // 禁止下载的备注信息
+    string forbidden_note = 4;
+}

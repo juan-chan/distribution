@@ -105,6 +105,18 @@ func getLogrusLogger(ctx context.Context, keys ...interface{}) *logrus.Entry {
 		}
 
 		fields["go.version"] = runtime.Version()
+
+		// FIXME: Docker 添加 SENTRY 支持存在 OOM 的问题，暂时注释掉
+		// // DSN值从环境变量获取， 环境变量的 key为：SENTRY_DSN
+		// if hook, err := logrus_sentry.NewAsyncSentryHook(
+		// 	"",
+		// 	[]logrus.Level{logrus.PanicLevel, logrus.FatalLevel, logrus.ErrorLevel},
+		// ); err == nil {
+		// 	// Tips: Add a hook to an instance of logger. This is called with
+		// 	//`log.Hooks.Add(new(MyHook))` where `MyHook` implements the `Hook` interface.
+		// 	logrus.AddHook(hook)
+		// }
+
 		// If no logger is found, just return the standard logger.
 		logger = logrus.StandardLogger().WithFields(fields)
 	}

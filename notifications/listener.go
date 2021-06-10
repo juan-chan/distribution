@@ -4,10 +4,10 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/docker/distribution"
+	"github.com/juan-chan/distribution"
 
-	dcontext "github.com/docker/distribution/context"
-	"github.com/docker/distribution/reference"
+	dcontext "github.com/juan-chan/distribution/context"
+	"github.com/juan-chan/distribution/reference"
 	"github.com/opencontainers/go-digest"
 )
 

@@ -7,17 +7,17 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/docker/distribution"
-	"github.com/docker/distribution/configuration"
-	dcontext "github.com/docker/distribution/context"
-	"github.com/docker/distribution/reference"
-	"github.com/docker/distribution/registry/client"
-	"github.com/docker/distribution/registry/client/auth"
-	"github.com/docker/distribution/registry/client/auth/challenge"
-	"github.com/docker/distribution/registry/client/transport"
-	"github.com/docker/distribution/registry/proxy/scheduler"
-	"github.com/docker/distribution/registry/storage"
-	"github.com/docker/distribution/registry/storage/driver"
+	"github.com/juan-chan/distribution"
+	"github.com/juan-chan/distribution/configuration"
+	dcontext "github.com/juan-chan/distribution/context"
+	"github.com/juan-chan/distribution/reference"
+	"github.com/juan-chan/distribution/registry/client"
+	"github.com/juan-chan/distribution/registry/client/auth"
+	"github.com/juan-chan/distribution/registry/client/auth/challenge"
+	"github.com/juan-chan/distribution/registry/client/transport"
+	"github.com/juan-chan/distribution/registry/proxy/scheduler"
+	"github.com/juan-chan/distribution/registry/storage"
+	"github.com/juan-chan/distribution/registry/storage/driver"
 )
 
 // proxyingRegistry fetches content from a remote registry and caches it locally
