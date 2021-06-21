@@ -15,8 +15,8 @@ import (
 // https://en.wikipedia.org/wiki/Consistency_model
 
 // NewVacuumCoding creates a new VacuumCoding
-func NewVacuumCoding(ctx context.Context, driver driver.StorageDriver) Vacuum {
-	return Vacuum{
+func NewVacuumCoding(ctx context.Context, driver driver.StorageDriver) VacuumCoding {
+	return VacuumCoding{
 		ctx:    ctx,
 		driver: driver,
 	}
