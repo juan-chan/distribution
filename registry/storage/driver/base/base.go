@@ -42,10 +42,10 @@ import (
 	"io"
 	"time"
 
+	"github.com/docker/go-metrics"
 	dcontext "github.com/juan-chan/distribution/context"
 	prometheus "github.com/juan-chan/distribution/metrics"
 	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
-	"github.com/docker/go-metrics"
 )
 
 var (
@@ -210,6 +210,11 @@ func (base *Base) Delete(ctx context.Context, path string) error {
 	err := base.setDriverName(base.StorageDriver.Delete(ctx, path))
 	storageAction.WithValues(base.Name(), "Delete").UpdateSince(start)
 	return err
+}
+
+// DeleteWithHost recursively deletes all objects stored at "path" and its subPaths with coding host.
+func (base *Base) DeleteWithHost(ctx context.Context, host, path string) error {
+	return base.Delete(ctx, path)
 }
 
 // URLFor wraps URLFor of underlying storage driver.

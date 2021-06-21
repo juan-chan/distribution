@@ -761,6 +761,11 @@ func (d *driver) Delete(context context.Context, path string) error {
 	return err
 }
 
+// DeleteWithHost recursively deletes all objects stored at "path" and its subPaths with coding host.
+func (d *driver) DeleteWithHost(ctx context.Context, host, path string) error {
+	return d.Delete(ctx, path)
+}
+
 func storageDeleteObject(context context.Context, bucket string, name string) error {
 	return retry(func() error {
 		return storage.DeleteObject(context, bucket, name)

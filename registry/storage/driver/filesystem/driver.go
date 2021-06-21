@@ -283,6 +283,11 @@ func (d *driver) Delete(ctx context.Context, subPath string) error {
 	return err
 }
 
+// DeleteWithHost recursively deletes all objects stored at "path" and its subPaths with coding host.
+func (d *driver) DeleteWithHost(ctx context.Context, host, path string) error {
+	return d.Delete(ctx, path)
+}
+
 // URLFor returns a URL which may be used to retrieve the content stored at the given path.
 // May return an UnsupportedMethodErr in certain StorageDriver implementations.
 func (d *driver) URLFor(ctx context.Context, path string, options map[string]interface{}) (string, error) {

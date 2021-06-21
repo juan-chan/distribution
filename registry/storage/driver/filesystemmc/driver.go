@@ -338,6 +338,24 @@ func (d *driver) Delete(ctx context.Context, subPath string) error {
 	return err
 }
 
+// DeleteWithHost recursively deletes all objects stored at "path" and its subPaths with coding host.
+func (d *driver) DeleteWithHost(ctx context.Context, host, path string) error{
+	fullPath, err := d.fullPathWithHost(ctx, host, path)
+	if err != nil {
+		return err
+	}
+
+	_, err = os.Stat(fullPath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	} else if err != nil {
+		return storagedriver.PathNotFoundError{Path: path}
+	}
+
+	err = os.RemoveAll(fullPath)
+	return err
+}
+
 // URLFor returns a URL which may be used to retrieve the content stored at the given path.
 // May return an UnsupportedMethodErr in certain StorageDriver implementations.
 func (d *driver) URLFor(ctx context.Context, path string, options map[string]interface{}) (string, error) {
@@ -414,6 +432,22 @@ func (d *driver) fullPath(subPath string, ctx context.Context) (string, error) {
 	prefix := getPrefix(ctx)
 
 	return path.Join(d.rootDirectory, prefix, subPath), nil
+}
+
+func (d *driver) fullPathWithHost(ctx context.Context, host, subPath string) (string, error) {
+	prefix := getPrefix(ctx)
+	if d.storageManagerAddress == "" {
+		return path.Join(d.rootDirectory, prefix, subPath), nil
+	}
+	if host == "" {
+		return d.fullPath(subPath, ctx)
+	}
+
+	storagePath, err := manager.GetStoragePath(d.grpcConnPool, d.storageManagerAddress, host, subPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get storage path: %v", err)
+	}
+	return path.Join(d.rootDirectory, storagePath), nil
 }
 
 type fileInfo struct {

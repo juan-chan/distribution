@@ -78,6 +78,9 @@ type StorageDriver interface {
 	// Delete recursively deletes all objects stored at "path" and its subpaths.
 	Delete(ctx context.Context, path string) error
 
+	// DeleteWithHost recursively deletes all objects stored at "path" and its subPaths with coding host.
+	DeleteWithHost(ctx context.Context, host, path string) error
+
 	// URLFor returns a URL which may be used to retrieve the content stored at
 	// the given path, possibly using the given options.
 	// May return an ErrUnsupportedMethod in certain StorageDriver

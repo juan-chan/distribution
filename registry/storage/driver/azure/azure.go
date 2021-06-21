@@ -336,6 +336,11 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 	return nil
 }
 
+// DeleteWithHost recursively deletes all objects stored at "path" and its subPaths with coding host.
+func (d *driver) DeleteWithHost(ctx context.Context, host, path string) error {
+	return d.Delete(ctx, path)
+}
+
 // URLFor returns a publicly accessible URL for the blob stored at given path
 // for specified duration by making use of Azure Storage Shared Access Signatures (SAS).
 // See https://msdn.microsoft.com/en-us/library/azure/ee395415.aspx for more info.

@@ -918,6 +918,68 @@ ListLoop:
 	return nil
 }
 
+// DeleteWithHost recursively deletes all objects stored at "path" and its subPaths with coding host.
+func (d *driver) DeleteWithHost(ctx context.Context, host, path string) error {
+	storagePath, err := d.storagePathWithHost(ctx, host, path)
+	if err != nil {
+		return err
+	}
+
+	s3Objects := make([]*s3.ObjectIdentifier, 0, listMax)
+	s3Path := storagePath
+	listObjectsInput := &s3.ListObjectsInput{
+		Bucket: aws.String(d.Bucket),
+		Prefix: aws.String(s3Path),
+	}
+ListLoop:
+	for {
+		// list all the objects
+		resp, err := d.S3.ListObjects(listObjectsInput)
+
+		// resp.Contents can only be empty on the first call
+		// if there were no more results to return after the first call, resp.IsTruncated would have been false
+		// and the loop would be exited without recalling ListObjects
+		if err != nil || len(resp.Contents) == 0 {
+			return storagedriver.PathNotFoundError{Path: storagePath}
+		}
+
+		for _, key := range resp.Contents {
+			// Stop if we encounter a key that is not a subpath (so that deleting "/a" does not delete "/ab").
+			if len(*key.Key) > len(s3Path) && (*key.Key)[len(s3Path)] != '/' {
+				break ListLoop
+			}
+			s3Objects = append(s3Objects, &s3.ObjectIdentifier{
+				Key: key.Key,
+			})
+		}
+
+		// resp.Contents must have at least one element or we would have returned not found
+		listObjectsInput.Marker = resp.Contents[len(resp.Contents)-1].Key
+
+		// from the s3 api docs, IsTruncated "specifies whether (true) or not (false) all of the results were returned"
+		// if everything has been returned, break
+		if resp.IsTruncated == nil || !*resp.IsTruncated {
+			break
+		}
+	}
+
+	// need to chunk objects into groups of 1000 per s3 restrictions
+	total := len(s3Objects)
+	for i := 0; i < total; i += 1000 {
+		_, err := d.S3.DeleteObjects(&s3.DeleteObjectsInput{
+			Bucket: aws.String(d.Bucket),
+			Delete: &s3.Delete{
+				Objects: s3Objects[i:min(i+1000, total)],
+				Quiet:   aws.Bool(false),
+			},
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // URLFor returns a URL which may be used to retrieve the content stored at the given path.
 // May return an UnsupportedMethodErr in certain StorageDriver implementations.
 func (d *driver) URLFor(ctx context.Context, path string, options map[string]interface{}) (string, error) {
@@ -1152,6 +1214,21 @@ func (d *driver) storagePath(subPath string, ctx context.Context) (string, error
 		return d.resolvePath(subPath, storagePath), nil
 	}
 	return d.resolvePath(subPath, path.Join(subPath)), nil
+}
+
+func (d *driver) storagePathWithHost(ctx context.Context, host, subPath string) (string, error) {
+	if d.StorageManagerAddress == "" {
+		return d.resolvePath(subPath, path.Join(subPath)), nil
+	}
+	if host == "" {
+		return d.storagePath(subPath, ctx)
+	}
+
+	storagePath, err := manager.GetStoragePath(d.grpcConnPool, d.StorageManagerAddress, host, subPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get storage path: %v", err)
+	}
+	return d.resolvePath(subPath, storagePath), nil
 }
 
 func findPrefixes(path, storagePath string) (string, string) {

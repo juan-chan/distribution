@@ -17,18 +17,17 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/juan-chan/distribution/registry/grpc"
-	"github.com/juan-chan/distribution/registry/storage/manager"
-
 	"github.com/sirupsen/logrus"
 	"github.com/tencentyun/cos-go-sdk-v5"
 
 	dcontext "github.com/juan-chan/distribution/context"
+	"github.com/juan-chan/distribution/registry/grpc"
 	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
 	"github.com/juan-chan/distribution/registry/storage/driver/base"
 	"github.com/juan-chan/distribution/registry/storage/driver/cos/cci"
 	"github.com/juan-chan/distribution/registry/storage/driver/cos/cdn"
 	"github.com/juan-chan/distribution/registry/storage/driver/factory"
+	"github.com/juan-chan/distribution/registry/storage/manager"
 )
 
 const (
@@ -718,6 +717,64 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 	return nil
 }
 
+// DeleteWithHost recursively deletes all objects stored at "path" and its subPaths with coding host.
+func (d *driver) DeleteWithHost(ctx context.Context, host, path string) error {
+	cosPath, err := d.cosPathWithHost(ctx, host, path)
+	if err != nil {
+		return err
+	}
+
+	opt := &cos.BucketGetOptions{
+		Prefix:  cosPath,
+		MaxKeys: listMax,
+	}
+	// list max objects
+	listResponse, _, err := d.Client.Bucket.Get(ctx, opt)
+	if err != nil || len(listResponse.Contents) == 0 {
+		return storagedriver.PathNotFoundError{Path: cosPath}
+	}
+
+	cosObjects := make([]cos.Object, listMax)
+
+	for len(listResponse.Contents) > 0 {
+		numCosObjects := len(listResponse.Contents)
+		for index, key := range listResponse.Contents {
+			// Stop if we encounter a key that is not a subpath (so that deleting "/a" does not delete "/ab").
+			if len(key.Key) > len(cosPath) && (key.Key)[len(cosPath)] != '/' {
+				numCosObjects = index
+				break
+			}
+			cosObjects[index].Key = key.Key
+		}
+
+		// delete by keys
+		opt := &cos.ObjectDeleteMultiOptions{
+			Objects: cosObjects[0:numCosObjects],
+			Quiet:   false,
+		}
+		_, _, err := d.Client.Object.DeleteMulti(ctx, opt)
+		if err != nil {
+			// delete fail
+			return parseError(path, err)
+		}
+
+		// contents contain keys which not in a subpath
+		if numCosObjects < len(listResponse.Contents) {
+			return nil
+		}
+
+		// fetch objects again
+		listResponse, _, err = d.Client.Bucket.Get(ctx, &cos.BucketGetOptions{
+			Prefix:  cosPath,
+			MaxKeys: listMax,
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (d *driver) URLFor(ctx context.Context, path string, options map[string]interface{}) (string, error) {
 
 	// FIXME: docker-for-mac will replace "%3d" to "=" , "/sign=a%3Db"  -> "/sign=a=b" , so sad :!
@@ -987,6 +1044,21 @@ func (d *driver) cosPath(subPath string, ctx context.Context) (string, error) {
 
 	return d.resolvePath(subPath, path.Join(subPath)), nil
 
+}
+
+func (d *driver) cosPathWithHost(ctx context.Context, host, subPath string) (string, error) {
+	if d.StorageManagerAddress == "" {
+		return d.resolvePath(subPath, path.Join(subPath)), nil
+	}
+	if host == "" {
+		return d.cosPath(subPath, ctx)
+	}
+
+	storagePath, err := manager.GetStoragePath(d.grpcConnPool, d.StorageManagerAddress, host, subPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get storage path: %v", err)
+	}
+	return d.resolvePath(subPath, storagePath), nil
 }
 
 // copy copies an object stored at sourcePath to destPath.

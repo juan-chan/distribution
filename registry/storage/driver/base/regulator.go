@@ -172,6 +172,11 @@ func (r *regulator) Delete(ctx context.Context, path string) error {
 	return r.StorageDriver.Delete(ctx, path)
 }
 
+// DeleteWithHost recursively deletes all objects stored at "path" and its subPaths with coding host.
+func (r *regulator) DeleteWithHost(ctx context.Context, host, path string) error {
+	return r.Delete(ctx, path)
+}
+
 // URLFor returns a URL which may be used to retrieve the content stored at
 // the given path, possibly using the given options.
 // May return an ErrUnsupportedMethod in certain StorageDriver
