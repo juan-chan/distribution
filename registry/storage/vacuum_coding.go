@@ -40,7 +40,7 @@ func (v VacuumCoding) RemoveBlob(host, dgst string) error {
 		return err
 	}
 
-	dcontext.GetLogger(v.ctx).Infof("Deleting blob: %s", blobPath)
+	dcontext.GetLogger(v.ctx).Infof("Deleting blob: %s, host: %s", blobPath, host)
 
 	err = v.driver.DeleteWithHost(v.ctx, host, blobPath)
 	if err != nil {
@@ -54,7 +54,6 @@ func (v VacuumCoding) RemoveBlob(host, dgst string) error {
 func (v VacuumCoding) RemoveManifest(host, name string, dgst digest.Digest, tags []string) error {
 	// remove a tag manifest reference, in case of not found continue to next one
 	for _, tag := range tags {
-
 		tagsPath, err := pathFor(manifestTagIndexEntryPathSpec{name: name, revision: dgst, tag: tag})
 		if err != nil {
 			return err
@@ -69,7 +68,7 @@ func (v VacuumCoding) RemoveManifest(host, name string, dgst digest.Digest, tags
 				return err
 			}
 		}
-		dcontext.GetLogger(v.ctx).Infof("deleting manifest tag reference: %s", tagsPath)
+		dcontext.GetLogger(v.ctx).Infof("deleting manifest tag reference: %s, host: %s", tagsPath, host)
 		err = v.driver.DeleteWithHost(v.ctx, host, tagsPath)
 		if err != nil {
 			return err
@@ -80,8 +79,8 @@ func (v VacuumCoding) RemoveManifest(host, name string, dgst digest.Digest, tags
 	if err != nil {
 		return err
 	}
-	dcontext.GetLogger(v.ctx).Infof("deleting manifest: %s", manifestPath)
-	return v.driver.Delete(v.ctx, manifestPath)
+	dcontext.GetLogger(v.ctx).Infof("deleting manifest: %s, host: %s", manifestPath, host)
+	return v.driver.DeleteWithHost(v.ctx, host, manifestPath)
 }
 
 // RemoveRepository removes a repository directory from the
@@ -92,7 +91,7 @@ func (v VacuumCoding) RemoveRepository(host, repoName string) error {
 		return err
 	}
 	repoDir := path.Join(rootForRepository, repoName)
-	dcontext.GetLogger(v.ctx).Infof("Deleting repo: %s", repoDir)
+	dcontext.GetLogger(v.ctx).Infof("Deleting repo: %s, host: %s", repoDir, host)
 	err = v.driver.DeleteWithHost(v.ctx, host, repoDir)
 	if err != nil {
 		return err

@@ -214,7 +214,17 @@ func (base *Base) Delete(ctx context.Context, path string) error {
 
 // DeleteWithHost recursively deletes all objects stored at "path" and its subPaths with coding host.
 func (base *Base) DeleteWithHost(ctx context.Context, host, path string) error {
-	return base.Delete(ctx, path)
+	ctx, done := dcontext.WithTrace(ctx)
+	defer done("%s.Delete(%q - %q)", base.Name(), host, path)
+
+	if !storagedriver.PathRegexp.MatchString(path) {
+		return storagedriver.InvalidPathError{Path: path, DriverName: base.StorageDriver.Name()}
+	}
+
+	start := time.Now()
+	err := base.setDriverName(base.StorageDriver.DeleteWithHost(ctx, host, path))
+	storageAction.WithValues(base.Name(), "Delete").UpdateSince(start)
+	return err
 }
 
 // URLFor wraps URLFor of underlying storage driver.
