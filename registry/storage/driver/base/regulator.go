@@ -174,7 +174,10 @@ func (r *regulator) Delete(ctx context.Context, path string) error {
 
 // DeleteWithHost recursively deletes all objects stored at "path" and its subPaths with coding host.
 func (r *regulator) DeleteWithHost(ctx context.Context, host, path string) error {
-	return r.Delete(ctx, path)
+	r.enter()
+	defer r.exit()
+
+	return r.StorageDriver.DeleteWithHost(ctx, host, path)
 }
 
 // URLFor returns a URL which may be used to retrieve the content stored at
