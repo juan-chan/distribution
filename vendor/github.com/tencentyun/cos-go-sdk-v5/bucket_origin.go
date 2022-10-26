@@ -12,10 +12,11 @@ type BucketPutOriginOptions struct {
 }
 
 type BucketOriginRule struct {
-	OriginType      string                 `xml:"OriginType"`
-	OriginCondition *BucketOriginCondition `xml:"OriginCondition"`
-	OriginParameter *BucketOriginParameter `xml:"OriginParameter"`
-	OriginInfo      *BucketOriginInfo      `xml:"OriginInfo"`
+	RulePriority    int                    `xml:"RulePriority,omitempty"`
+	OriginType      string                 `xml:"OriginType,omitempty"`
+	OriginCondition *BucketOriginCondition `xml:"OriginCondition,omitempty"`
+	OriginParameter *BucketOriginParameter `xml:"OriginParameter,omitempty"`
+	OriginInfo      *BucketOriginInfo      `xml:"OriginInfo,omitempty"`
 }
 
 type BucketOriginCondition struct {
@@ -63,7 +64,7 @@ func (s *BucketService) PutOrigin(ctx context.Context, opt *BucketPutOriginOptio
 		method:  http.MethodPut,
 		body:    opt,
 	}
-	resp, err := s.client.send(ctx, sendOpt)
+	resp, err := s.client.doRetry(ctx, sendOpt)
 	return resp, err
 }
 
@@ -75,7 +76,7 @@ func (s *BucketService) GetOrigin(ctx context.Context) (*BucketGetOriginResult, 
 		method:  http.MethodGet,
 		result:  &res,
 	}
-	resp, err := s.client.send(ctx, sendOpt)
+	resp, err := s.client.doRetry(ctx, sendOpt)
 	return &res, resp, err
 }
 
@@ -85,6 +86,6 @@ func (s *BucketService) DeleteOrigin(ctx context.Context) (*Response, error) {
 		uri:     "/?origin",
 		method:  http.MethodDelete,
 	}
-	resp, err := s.client.send(ctx, sendOpt)
+	resp, err := s.client.doRetry(ctx, sendOpt)
 	return resp, err
 }

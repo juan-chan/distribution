@@ -1,12 +1,18 @@
 package cos
 
 import (
+	"bytes"
 	"context"
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"hash/crc64"
 	"io"
 	"net/http"
+	"net/url"
+	"sort"
+	"strings"
+	"time"
 )
 
 // InitiateMultipartUploadOptions is the option of InitateMultipartUpload
@@ -35,21 +41,25 @@ func (s *ObjectService) InitiateMultipartUpload(ctx context.Context, name string
 		optHeader: opt,
 		result:    &res,
 	}
-	resp, err := s.client.send(ctx, &sendOpt)
+	resp, err := s.client.doRetry(ctx, &sendOpt)
 	return &res, resp, err
 }
 
 // ObjectUploadPartOptions is the options of upload-part
 type ObjectUploadPartOptions struct {
-	Expect          string `header:"Expect,omitempty" url:"-"`
-	XCosContentSHA1 string `header:"x-cos-content-sha1,omitempty" url:"-"`
-	ContentLength   int    `header:"Content-Length,omitempty" url:"-"`
-
+	Expect                string `header:"Expect,omitempty" url:"-"`
+	XCosContentSHA1       string `header:"x-cos-content-sha1,omitempty" url:"-"`
+	ContentLength         int64  `header:"Content-Length,omitempty" url:"-"`
+	ContentMD5            string `header:"Content-MD5,omitempty" url:"-"`
 	XCosSSECustomerAglo   string `header:"x-cos-server-side-encryption-customer-algorithm,omitempty" url:"-" xml:"-"`
 	XCosSSECustomerKey    string `header:"x-cos-server-side-encryption-customer-key,omitempty" url:"-" xml:"-"`
 	XCosSSECustomerKeyMD5 string `header:"x-cos-server-side-encryption-customer-key-MD5,omitempty" url:"-" xml:"-"`
 
 	XCosTrafficLimit int `header:"x-cos-traffic-limit,omitempty" url:"-" xml:"-"`
+
+	XOptionHeader *http.Header `header:"-,omitempty" url:"-" xml:"-"`
+	// 上传进度, ProgressCompleteEvent不能表示对应API调用成功，API是否调用成功的判断标准为返回err==nil
+	Listener ProgressListener `header:"-" url:"-" xml:"-"`
 }
 
 // UploadPart 请求实现在初始化以后的分块上传，支持的块的数量为1到10000，块的大小为1 MB 到5 GB。
@@ -60,14 +70,43 @@ type ObjectUploadPartOptions struct {
 // 当 r 不是 bytes.Buffer/bytes.Reader/strings.Reader 时，必须指定 opt.ContentLength
 //
 // https://www.qcloud.com/document/product/436/7750
-func (s *ObjectService) UploadPart(ctx context.Context, name, uploadID string, partNumber int, r io.Reader, opt *ObjectUploadPartOptions) (*Response, error) {
+func (s *ObjectService) UploadPart(ctx context.Context, name, uploadID string, partNumber int, r io.Reader, uopt *ObjectUploadPartOptions) (*Response, error) {
+	if r == nil {
+		return nil, fmt.Errorf("reader is nil")
+	}
+	if err := CheckReaderLen(r); err != nil {
+		return nil, err
+	}
+	// opt 不为 nil
+	opt := CloneObjectUploadPartOptions(uopt)
+	totalBytes, err := GetReaderLen(r)
+	if err != nil && opt.Listener != nil {
+		if opt.ContentLength == 0 {
+			return nil, err
+		}
+		totalBytes = opt.ContentLength
+	}
+	// 分块上传不支持 Chunk 上传
+	if err == nil {
+		// 与 go http 保持一致, 非bytes.Buffer/bytes.Reader/strings.Reader需用户指定ContentLength
+		if opt != nil && opt.ContentLength == 0 && IsLenReader(r) {
+			opt.ContentLength = totalBytes
+		}
+	}
+	reader := TeeReader(r, nil, totalBytes, nil)
+	if s.client.Conf.EnableCRC {
+		reader.writer = crc64.New(crc64.MakeTable(crc64.ECMA))
+	}
+	if opt != nil && opt.Listener != nil {
+		reader.listener = opt.Listener
+	}
 	u := fmt.Sprintf("/%s?partNumber=%d&uploadId=%s", encodeURIComponent(name), partNumber, uploadID)
 	sendOpt := sendOptions{
 		baseURL:   s.client.BaseURL.BucketURL,
 		uri:       u,
 		method:    http.MethodPut,
 		optHeader: opt,
-		body:      r,
+		body:      reader,
 	}
 	resp, err := s.client.send(ctx, &sendOpt)
 	return resp, err
@@ -110,7 +149,7 @@ func (s *ObjectService) ListParts(ctx context.Context, name, uploadID string, op
 		result:   &res,
 		optQuery: opt,
 	}
-	resp, err := s.client.send(ctx, &sendOpt)
+	resp, err := s.client.doRetry(ctx, &sendOpt)
 	return &res, resp, err
 }
 
@@ -171,7 +210,7 @@ func (s *ObjectService) CompleteMultipartUpload(ctx context.Context, name, uploa
 		body:      opt,
 		result:    &res,
 	}
-	resp, err := s.client.send(ctx, &sendOpt)
+	resp, err := s.client.doRetry(ctx, &sendOpt)
 	// If the error occurs during the copy operation, the error response is embedded in the 200 OK response. This means that a 200 OK response can contain either a success or an error.
 	if err == nil && resp.StatusCode == 200 {
 		if res.ETag == "" {
@@ -188,13 +227,16 @@ func (s *ObjectService) CompleteMultipartUpload(ctx context.Context, name, uploa
 //
 // https://www.qcloud.com/document/product/436/7740
 func (s *ObjectService) AbortMultipartUpload(ctx context.Context, name, uploadID string) (*Response, error) {
+	if len(name) == 0 || name == "/" {
+		return nil, errors.New("empty object name")
+	}
 	u := fmt.Sprintf("/%s?uploadId=%s", encodeURIComponent(name), uploadID)
 	sendOpt := sendOptions{
 		baseURL: s.client.BaseURL.BucketURL,
 		uri:     u,
 		method:  http.MethodDelete,
 	}
-	resp, err := s.client.send(ctx, &sendOpt)
+	resp, err := s.client.doRetry(ctx, &sendOpt)
 	return resp, err
 }
 
@@ -230,30 +272,41 @@ func (s *ObjectService) CopyPart(ctx context.Context, name, uploadID string, par
 	opt.XCosCopySource = sourceURL
 	u := fmt.Sprintf("/%s?partNumber=%d&uploadId=%s", encodeURIComponent(name), partNumber, uploadID)
 	var res CopyPartResult
+	var bs bytes.Buffer
 	sendOpt := sendOptions{
 		baseURL:   s.client.BaseURL.BucketURL,
 		uri:       u,
 		method:    http.MethodPut,
 		optHeader: opt,
-		result:    &res,
+		result:    &bs,
 	}
-	resp, err := s.client.send(ctx, &sendOpt)
-	// If the error occurs during the copy operation, the error response is embedded in the 200 OK response. This means that a 200 OK response can contain either a success or an error.
-	if err == nil && resp != nil && resp.StatusCode == 200 {
-		if res.ETag == "" {
-			return &res, resp, errors.New("response 200 OK, but body contains an error")
+	resp, err := s.client.doRetry(ctx, &sendOpt)
+
+	if err == nil { // 请求正常
+		err = xml.Unmarshal(bs.Bytes(), &res) // body 正常返回
+		if err == io.EOF {
+			err = nil
+		}
+		// If the error occurs during the copy operation, the error response is embedded in the 200 OK response. This means that a 200 OK response can contain either a success or an error.
+		if resp != nil && resp.StatusCode == 200 {
+			if err != nil {
+				resErr := &ErrorResponse{Response: resp.Response}
+				xml.Unmarshal(bs.Bytes(), resErr)
+				return &res, resp, resErr
+			}
 		}
 	}
+
 	return &res, resp, err
 }
 
 type ObjectListUploadsOptions struct {
-	Delimiter      string `url:"Delimiter,omitempty"`
-	EncodingType   string `url:"EncodingType,omitempty"`
-	Prefix         string `url:"Prefix"`
-	MaxUploads     int    `url:"MaxUploads"`
-	KeyMarker      string `url:"KeyMarker"`
-	UploadIdMarker string `url:"UploadIDMarker"`
+	Delimiter      string `url:"delimiter,omitempty"`
+	EncodingType   string `url:"encoding-type,omitempty"`
+	Prefix         string `url:"prefix,omitempty"`
+	MaxUploads     int    `url:"max-uploads,omitempty"`
+	KeyMarker      string `url:"key-marker,omitempty"`
+	UploadIdMarker string `url:"upload-id-marker,omitempty"`
 }
 
 type ObjectListUploadsResult struct {
@@ -290,6 +343,191 @@ func (s *ObjectService) ListUploads(ctx context.Context, opt *ObjectListUploadsO
 		optQuery: opt,
 		result:   &res,
 	}
-	resp, err := s.client.send(ctx, sendOpt)
+	resp, err := s.client.doRetry(ctx, sendOpt)
 	return &res, resp, err
+}
+
+type MultiCopyOptions struct {
+	OptCopy        *ObjectCopyOptions
+	PartSize       int64
+	ThreadPoolSize int
+	useMulti       bool // use for ut
+}
+
+type CopyJobs struct {
+	Name       string
+	UploadId   string
+	RetryTimes int
+	Chunk      Chunk
+	Opt        *ObjectCopyPartOptions
+}
+
+type CopyResults struct {
+	PartNumber int
+	Resp       *Response
+	err        error
+	res        *CopyPartResult
+}
+
+func copyworker(ctx context.Context, s *ObjectService, jobs <-chan *CopyJobs, results chan<- *CopyResults) {
+	for j := range jobs {
+		var copyres CopyResults
+		j.Opt.XCosCopySourceRange = fmt.Sprintf("bytes=%d-%d", j.Chunk.OffSet, j.Chunk.OffSet+j.Chunk.Size-1)
+		rt := j.RetryTimes
+		for {
+			res, resp, err := s.CopyPart(ctx, j.Name, j.UploadId, j.Chunk.Number, j.Opt.XCosCopySource, j.Opt)
+			copyres.PartNumber = j.Chunk.Number
+			copyres.Resp = resp
+			copyres.err = err
+			copyres.res = res
+			if err != nil {
+				rt--
+				if rt == 0 {
+					results <- &copyres
+					break
+				}
+				if resp != nil && resp.StatusCode < 499 && resp.StatusCode >= 400 {
+					results <- &copyres
+					break
+				}
+				time.Sleep(10 * time.Millisecond)
+				continue
+			}
+			results <- &copyres
+			break
+		}
+	}
+}
+
+func (s *ObjectService) innerHead(ctx context.Context, sourceURL string, opt *ObjectHeadOptions, id []string) (resp *Response, err error) {
+	surl := strings.SplitN(sourceURL, "/", 2)
+	if len(surl) < 2 {
+		err = errors.New(fmt.Sprintf("sourceURL format error: %s", sourceURL))
+		return
+	}
+
+	u, err := url.Parse(fmt.Sprintf("http://%s", surl[0]))
+	if err != nil {
+		return
+	}
+	b := &BaseURL{BucketURL: u}
+	client := NewClient(b, &http.Client{
+		Transport: s.client.client.Transport,
+	})
+	if len(id) > 0 {
+		resp, err = client.Object.Head(ctx, surl[1], nil, id[0])
+	} else {
+		resp, err = client.Object.Head(ctx, surl[1], nil)
+	}
+	return
+}
+
+// 如果源对象大于5G，则采用分块复制的方式进行拷贝，此时源对象的元信息如果COPY
+func (s *ObjectService) MultiCopy(ctx context.Context, name string, sourceURL string, opt *MultiCopyOptions, id ...string) (*ObjectCopyResult, *Response, error) {
+	resp, err := s.innerHead(ctx, sourceURL, nil, id)
+	if err != nil {
+		return nil, nil, err
+	}
+	totalBytes := resp.ContentLength
+	surl := strings.SplitN(sourceURL, "/", 2)
+	if len(surl) < 2 {
+		return nil, nil, errors.New(fmt.Sprintf("x-cos-copy-source format error: %s", sourceURL))
+	}
+	var u string
+	if len(id) == 1 {
+		u = fmt.Sprintf("%s/%s?versionId=%s", surl[0], encodeURIComponent(surl[1]), id[0])
+	} else if len(id) == 0 {
+		u = fmt.Sprintf("%s/%s", surl[0], encodeURIComponent(surl[1]))
+	} else {
+		return nil, nil, errors.New("wrong params")
+	}
+
+	if opt == nil {
+		opt = &MultiCopyOptions{}
+	}
+	chunks, partNum, err := SplitSizeIntoChunks(totalBytes, opt.PartSize*1024*1024)
+	if err != nil {
+		return nil, nil, err
+	}
+	if partNum == 0 || (totalBytes < singleUploadMaxLength && !opt.useMulti) {
+		if len(id) > 0 {
+			return s.Copy(ctx, name, sourceURL, opt.OptCopy, id[0])
+		} else {
+			return s.Copy(ctx, name, sourceURL, opt.OptCopy)
+		}
+	}
+	optini := CopyOptionsToMulti(opt.OptCopy)
+	var uploadID string
+	res, _, err := s.InitiateMultipartUpload(ctx, name, optini)
+	if err != nil {
+		return nil, nil, err
+	}
+	uploadID = res.UploadID
+
+	var poolSize int
+	if opt.ThreadPoolSize > 0 {
+		poolSize = opt.ThreadPoolSize
+	} else {
+		poolSize = 1
+	}
+
+	chjobs := make(chan *CopyJobs, 100)
+	chresults := make(chan *CopyResults, 10000)
+	optcom := &CompleteMultipartUploadOptions{}
+
+	for w := 1; w <= poolSize; w++ {
+		go copyworker(ctx, s, chjobs, chresults)
+	}
+
+	go func() {
+		for _, chunk := range chunks {
+			partOpt := &ObjectCopyPartOptions{
+				XCosCopySource: u,
+			}
+			if opt.OptCopy != nil && opt.OptCopy.ObjectCopyHeaderOptions != nil {
+				partOpt.XCosCopySourceIfModifiedSince = opt.OptCopy.XCosCopySourceIfModifiedSince
+				partOpt.XCosCopySourceIfUnmodifiedSince = opt.OptCopy.XCosCopySourceIfUnmodifiedSince
+				partOpt.XCosCopySourceIfMatch = opt.OptCopy.XCosCopySourceIfMatch
+				partOpt.XCosCopySourceIfNoneMatch = opt.OptCopy.XCosCopySourceIfNoneMatch
+			}
+			job := &CopyJobs{
+				Name:       name,
+				RetryTimes: 3,
+				UploadId:   uploadID,
+				Chunk:      chunk,
+				Opt:        partOpt,
+			}
+			chjobs <- job
+		}
+		close(chjobs)
+	}()
+	err = nil
+	for i := 0; i < partNum; i++ {
+		res := <-chresults
+		if res.res == nil || res.err != nil {
+			err = fmt.Errorf("UploadID %s, part %d failed to get resp content. error: %s", uploadID, res.PartNumber, res.err.Error())
+			continue
+		}
+		etag := res.res.ETag
+		optcom.Parts = append(optcom.Parts, Object{
+			PartNumber: res.PartNumber, ETag: etag},
+		)
+	}
+	close(chresults)
+	if err != nil {
+		return nil, nil, err
+	}
+	sort.Sort(ObjectList(optcom.Parts))
+
+	v, resp, err := s.CompleteMultipartUpload(ctx, name, uploadID, optcom)
+	if err != nil {
+		s.AbortMultipartUpload(ctx, name, uploadID)
+		return nil, resp, err
+	}
+	cpres := &ObjectCopyResult{
+		ETag:      v.ETag,
+		CRC64:     resp.Header.Get("x-cos-hash-crc64ecma"),
+		VersionId: resp.Header.Get("x-cos-version-id"),
+	}
+	return cpres, resp, err
 }

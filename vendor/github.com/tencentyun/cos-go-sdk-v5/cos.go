@@ -13,7 +13,9 @@ import (
 	"reflect"
 	"strings"
 	"text/template"
+	"time"
 
+	"regexp"
 	"strconv"
 
 	"github.com/google/go-querystring/query"
@@ -22,16 +24,23 @@ import (
 
 const (
 	// Version current go sdk version
-	Version               = "0.7.12"
-	userAgent             = "cos-go-sdk-v5/" + Version
+	Version               = "0.7.39"
+	UserAgent             = "cos-go-sdk-v5/" + Version
 	contentTypeXML        = "application/xml"
 	defaultServiceBaseURL = "http://service.cos.myqcloud.com"
 )
 
-var bucketURLTemplate = template.Must(
-	template.New("bucketURLFormat").Parse(
-		"{{.Schema}}://{{.BucketName}}.cos.{{.Region}}.myqcloud.com",
-	),
+var (
+	bucketURLTemplate = template.Must(
+		template.New("bucketURLFormat").Parse(
+			"{{.Schema}}://{{.BucketName}}.cos.{{.Region}}.myqcloud.com",
+		),
+	)
+
+	// {<http://>|<https://>}{bucketname-appid}.{cos|cos-internal|cos-website|ci}.{region}.{myqcloud.com/tencentcos.cn}{/}
+	hostSuffix       = regexp.MustCompile(`^.*((cos|cos-internal|cos-website|ci)\.[a-z-1]+|file)\.(myqcloud\.com|tencentcos\.cn).*$`)
+	hostPrefix       = regexp.MustCompile(`^(http://|https://){0,1}([a-z0-9-]+-[0-9]+\.){0,1}((cos|cos-internal|cos-website|ci)\.[a-z-1]+|file)\.(myqcloud\.com|tencentcos\.cn).*$`)
+	invalidBucketErr = fmt.Errorf("invalid bucket format, please check your cos.BaseURL")
 )
 
 // BaseURL 访问各 API 所需的基础 URL
@@ -44,6 +53,8 @@ type BaseURL struct {
 	BatchURL *url.URL
 	// 访问 CI 的基础 URL
 	CIURL *url.URL
+	// 访问 Fetch Task 的基础 URL
+	FetchURL *url.URL
 }
 
 // NewBucketURL 生成 BaseURL 所需的 BucketURL
@@ -51,12 +62,18 @@ type BaseURL struct {
 //   bucketName: bucket名称, bucket的命名规则为{name}-{appid} ，此处填写的存储桶名称必须为此格式
 //   Region: 区域代码: ap-beijing-1,ap-beijing,ap-shanghai,ap-guangzhou...
 //   secure: 是否使用 https
-func NewBucketURL(bucketName, region string, secure bool) *url.URL {
+func NewBucketURL(bucketName, region string, secure bool) (*url.URL, error) {
 	schema := "https"
 	if !secure {
 		schema = "http"
 	}
 
+	if region == "" {
+		return nil, fmt.Errorf("region[%v] is invalid", region)
+	}
+	if bucketName == "" || !strings.ContainsAny(bucketName, "-") {
+		return nil, fmt.Errorf("bucketName[%v] is invalid", bucketName)
+	}
 	w := bytes.NewBuffer(nil)
 	bucketURLTemplate.Execute(w, struct {
 		Schema     string
@@ -67,7 +84,18 @@ func NewBucketURL(bucketName, region string, secure bool) *url.URL {
 	})
 
 	u, _ := url.Parse(w.String())
-	return u
+	return u, nil
+}
+
+type RetryOptions struct {
+	Count      int
+	Interval   time.Duration
+	StatusCode []int
+}
+type Config struct {
+	EnableCRC        bool
+	RequestBodyClose bool
+	RetryOpt         RetryOptions
 }
 
 // Client is a client manages communication with the COS API.
@@ -85,6 +113,8 @@ type Client struct {
 	Object  *ObjectService
 	Batch   *BatchService
 	CI      *CIService
+
+	Conf *Config
 }
 
 type service struct {
@@ -103,6 +133,7 @@ func NewClient(uri *BaseURL, httpClient *http.Client) *Client {
 		baseURL.ServiceURL = uri.ServiceURL
 		baseURL.BatchURL = uri.BatchURL
 		baseURL.CIURL = uri.CIURL
+		baseURL.FetchURL = uri.FetchURL
 	}
 	if baseURL.ServiceURL == nil {
 		baseURL.ServiceURL, _ = url.Parse(defaultServiceBaseURL)
@@ -110,8 +141,16 @@ func NewClient(uri *BaseURL, httpClient *http.Client) *Client {
 
 	c := &Client{
 		client:    httpClient,
-		UserAgent: userAgent,
+		UserAgent: UserAgent,
 		BaseURL:   baseURL,
+		Conf: &Config{
+			EnableCRC:        true,
+			RequestBodyClose: false,
+			RetryOpt: RetryOptions{
+				Count:    3,
+				Interval: time.Duration(0),
+			},
+		},
 	}
 	c.common.client = c
 	c.Service = (*ServiceService)(&c.common)
@@ -122,7 +161,48 @@ func NewClient(uri *BaseURL, httpClient *http.Client) *Client {
 	return c
 }
 
+type Credential struct {
+	SecretID     string
+	SecretKey    string
+	SessionToken string
+}
+
+func (c *Client) GetCredential() *Credential {
+	if auth, ok := c.client.Transport.(*AuthorizationTransport); ok {
+		auth.rwLocker.Lock()
+		defer auth.rwLocker.Unlock()
+		return &Credential{
+			SecretID:     auth.SecretID,
+			SecretKey:    auth.SecretKey,
+			SessionToken: auth.SessionToken,
+		}
+	}
+	if auth, ok := c.client.Transport.(*CVMCredentialTransport); ok {
+		ak, sk, token, err := auth.GetCredential()
+		if err != nil {
+			return nil
+		}
+		return &Credential{
+			SecretID:     ak,
+			SecretKey:    sk,
+			SessionToken: token,
+		}
+	}
+	if auth, ok := c.client.Transport.(*CredentialTransport); ok {
+		ak, sk, token := auth.Credential.GetSecretId(), auth.Credential.GetSecretKey(), auth.Credential.GetToken()
+		return &Credential{
+			SecretID:     ak,
+			SecretKey:    sk,
+			SessionToken: token,
+		}
+	}
+	return nil
+}
+
 func (c *Client) newRequest(ctx context.Context, baseURL *url.URL, uri, method string, body interface{}, optQuery interface{}, optHeader interface{}) (req *http.Request, err error) {
+	if !checkURL(baseURL) {
+		return nil, invalidBucketErr
+	}
 	uri, err = addURLOptions(uri, optQuery)
 	if err != nil {
 		return
@@ -164,8 +244,10 @@ func (c *Client) newRequest(ctx context.Context, baseURL *url.URL, uri, method s
 	if contentMD5 != "" {
 		req.Header["Content-MD5"] = []string{contentMD5}
 	}
-	if c.UserAgent != "" {
-		req.Header.Set("User-Agent", c.UserAgent)
+	if v := req.Header.Get("User-Agent"); v == "" || !strings.HasPrefix(v, UserAgent) {
+		if c.UserAgent != "" {
+			req.Header.Set("User-Agent", c.UserAgent)
+		}
 	}
 	if req.Header.Get("Content-Type") == "" && contentType != "" {
 		req.Header.Set("Content-Type", contentType)
@@ -173,10 +255,18 @@ func (c *Client) newRequest(ctx context.Context, baseURL *url.URL, uri, method s
 	if c.Host != "" {
 		req.Host = c.Host
 	}
+	if c.Conf.RequestBodyClose {
+		req.Close = true
+	}
 	return
 }
 
 func (c *Client) doAPI(ctx context.Context, req *http.Request, result interface{}, closeBody bool) (*Response, error) {
+	var cancel context.CancelFunc
+	if closeBody {
+		ctx, cancel = context.WithCancel(ctx)
+		defer cancel()
+	}
 	req = req.WithContext(ctx)
 
 	resp, err := c.client.Do(req)
@@ -203,9 +293,25 @@ func (c *Client) doAPI(ctx context.Context, req *http.Request, result interface{
 
 	err = checkResponse(resp)
 	if err != nil {
+		// StatusCode != 2xx when Get Object
+		if !closeBody {
+			resp.Body.Close()
+		}
 		// even though there was an error, we still return the response
 		// in case the caller wants to inspect it further
 		return response, err
+	}
+
+	// need CRC64 verification
+	if reader, ok := req.Body.(*teeReader); ok {
+		if c.Conf.EnableCRC && reader.writer != nil && !reader.disableCheckSum {
+			localcrc := reader.Crc64()
+			scoscrc := response.Header.Get("x-cos-hash-crc64ecma")
+			icoscrc, err := strconv.ParseUint(scoscrc, 10, 64)
+			if icoscrc != localcrc {
+				return response, fmt.Errorf("verification failed, want:%v, return:%v, x-cos-hash-crc64ecma:%v, err:%v", localcrc, icoscrc, scoscrc, err)
+			}
+		}
 	}
 
 	if result != nil {
@@ -242,6 +348,45 @@ type sendOptions struct {
 	disableCloseBody bool
 }
 
+func (c *Client) doRetry(ctx context.Context, opt *sendOptions) (resp *Response, err error) {
+	if opt.body != nil {
+		if _, ok := opt.body.(io.Reader); ok {
+			resp, err = c.send(ctx, opt)
+			return
+		}
+	}
+	count := 1
+	if count < c.Conf.RetryOpt.Count {
+		count = c.Conf.RetryOpt.Count
+	}
+	nr := 0
+	interval := c.Conf.RetryOpt.Interval
+	for nr < count {
+		resp, err = c.send(ctx, opt)
+		if err != nil && err != invalidBucketErr {
+			if resp != nil && resp.StatusCode <= 499 {
+				dobreak := true
+				for _, v := range c.Conf.RetryOpt.StatusCode {
+					if resp.StatusCode == v {
+						dobreak = false
+						break
+					}
+				}
+				if dobreak {
+					break
+				}
+			}
+			nr++
+			if interval > 0 && nr < count {
+				time.Sleep(interval)
+			}
+			continue
+		}
+		break
+	}
+	return
+
+}
 func (c *Client) send(ctx context.Context, opt *sendOptions) (resp *Response, err error) {
 	req, err := c.newRequest(ctx, opt.baseURL, opt.uri, opt.method, opt.body, opt.optQuery, opt.optHeader)
 	if err != nil {
@@ -303,6 +448,14 @@ func addHeaderOptions(header http.Header, opt interface{}) (http.Header, error) 
 		}
 	}
 	return header, nil
+}
+
+func checkURL(baseURL *url.URL) bool {
+	host := baseURL.String()
+	if hostSuffix.MatchString(host) && !hostPrefix.MatchString(host) {
+		return false
+	}
+	return true
 }
 
 // Owner defines Bucket/Object's owner

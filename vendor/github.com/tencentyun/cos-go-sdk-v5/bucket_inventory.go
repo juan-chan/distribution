@@ -15,9 +15,15 @@ type BucketGetInventoryResult BucketPutInventoryOptions
 // BucketListInventoryConfiguartion same struct to options
 type BucketListInventoryConfiguartion BucketPutInventoryOptions
 
+type BucketInventoryFilterPeriod struct {
+	StartTime int64 `xml:"StartTime,omitempty"`
+	EndTime   int64 `xml:"EndTime,omitempty"`
+}
+
 // BucketInventoryFilter ...
 type BucketInventoryFilter struct {
-	Prefix string `xml:"Prefix,omitempty"`
+	Prefix string                       `xml:"Prefix,omitempty"`
+	Period *BucketInventoryFilterPeriod `xml:"Period,omitempty"`
 }
 
 // BucketInventoryOptionalFields ...
@@ -74,7 +80,7 @@ func (s *BucketService) PutInventory(ctx context.Context, id string, opt *Bucket
 		method:  http.MethodPut,
 		body:    opt,
 	}
-	resp, err := s.client.send(ctx, &sendOpt)
+	resp, err := s.client.doRetry(ctx, &sendOpt)
 	return resp, err
 
 }
@@ -89,7 +95,7 @@ func (s *BucketService) GetInventory(ctx context.Context, id string) (*BucketGet
 		method:  http.MethodGet,
 		result:  &res,
 	}
-	resp, err := s.client.send(ctx, &sendOpt)
+	resp, err := s.client.doRetry(ctx, &sendOpt)
 	return &res, resp, err
 }
 
@@ -101,7 +107,7 @@ func (s *BucketService) DeleteInventory(ctx context.Context, id string) (*Respon
 		uri:     u,
 		method:  http.MethodDelete,
 	}
-	resp, err := s.client.send(ctx, &sendOpt)
+	resp, err := s.client.doRetry(ctx, &sendOpt)
 	return resp, err
 }
 
@@ -120,7 +126,7 @@ func (s *BucketService) ListInventoryConfigurations(ctx context.Context, token s
 		method:  http.MethodGet,
 		result:  &res,
 	}
-	resp, err := s.client.send(ctx, &sendOpt)
+	resp, err := s.client.doRetry(ctx, &sendOpt)
 	return &res, resp, err
 
 }

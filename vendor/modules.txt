@@ -54,6 +54,8 @@ github.com/bugsnag/bugsnag-go/errors
 github.com/bugsnag/osext
 # github.com/bugsnag/panicwrap v0.0.0-20151223152923-e2c28503fcd0
 github.com/bugsnag/panicwrap
+# github.com/clbanning/mxj v1.8.4
+github.com/clbanning/mxj
 # github.com/denverdino/aliyungo v0.0.0-20190125010748-a747050bb1ba
 github.com/denverdino/aliyungo/cdn/auth
 github.com/denverdino/aliyungo/common
@@ -78,7 +80,7 @@ github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
-# github.com/google/go-querystring v1.0.0
+# github.com/google/go-querystring v1.1.0
 github.com/google/go-querystring/query
 # github.com/gorilla/handlers v0.0.0-20150720190736-60c7bfde3e33
 github.com/gorilla/handlers
@@ -100,9 +102,9 @@ github.com/konsorten/go-windows-terminal-sequences
 github.com/marstr/guid
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
-# github.com/mitchellh/mapstructure v1.1.2
+# github.com/mitchellh/mapstructure v1.5.0
 github.com/mitchellh/mapstructure
-# github.com/mozillazg/go-httpheader v0.2.1
+# github.com/mozillazg/go-httpheader v0.3.1
 github.com/mozillazg/go-httpheader
 # github.com/ncw/swift v1.0.47
 github.com/ncw/swift
@@ -133,7 +135,7 @@ github.com/sirupsen/logrus
 github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.3
 github.com/spf13/pflag
-# github.com/tencentyun/cos-go-sdk-v5 v0.7.12
+# github.com/tencentyun/cos-go-sdk-v5 v0.7.39
 github.com/tencentyun/cos-go-sdk-v5
 # github.com/yvasiyarov/go-metrics v0.0.0-20140926110328-57bccd1ccd43
 github.com/yvasiyarov/go-metrics

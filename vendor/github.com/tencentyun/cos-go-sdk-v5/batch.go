@@ -13,7 +13,7 @@ type BatchRequestHeaders struct {
 	XCosAppid     int          `header:"x-cos-appid" xml:"-" url:"-"`
 	ContentLength string       `header:"Content-Length,omitempty" xml:"-" url:"-"`
 	ContentType   string       `header:"Content-Type,omitempty" xml:"-" url:"-"`
-	Headers       *http.Header `header:"-" xml:"-", url:"-"`
+	Headers       *http.Header `header:"-" xml:"-" url:"-"`
 }
 
 // BatchProgressSummary
@@ -111,13 +111,6 @@ type BatchCreateJobOptions struct {
 type BatchCreateJobResult struct {
 	XMLName xml.Name `xml:"CreateJobResult"`
 	JobId   string   `xml:"JobId,omitempty"`
-}
-
-func processETag(opt *BatchCreateJobOptions) *BatchCreateJobOptions {
-	if opt != nil && opt.Manifest != nil && opt.Manifest.Location != nil {
-		opt.Manifest.Location.ETag = "<ETag>" + opt.Manifest.Location.ETag + "</ETag>"
-	}
-	return opt
 }
 
 func (s *BatchService) CreateJob(ctx context.Context, opt *BatchCreateJobOptions, headers *BatchRequestHeaders) (*BatchCreateJobResult, *Response, error) {
@@ -244,7 +237,7 @@ func (s *BatchService) UpdateJobPriority(ctx context.Context, opt *BatchUpdatePr
 type BatchUpdateStatusOptions struct {
 	JobId              string `header:"-" url:"-" xml:"-"`
 	RequestedJobStatus string `url:"requestedJobStatus" header:"-" xml:"-"`
-	StatusUpdateReason string `url:"statusUpdateReason,omitempty" header:"-", xml:"-"`
+	StatusUpdateReason string `url:"statusUpdateReason,omitempty" header:"-" xml:"-"`
 }
 type BatchUpdateStatusResult struct {
 	XMLName            xml.Name `xml:"UpdateJobStatusResult"`

@@ -427,7 +427,7 @@ func (d *driver) PutContent(ctx context.Context, path string, content []byte) er
 	opt := &cos.ObjectPutOptions{
 		ObjectPutHeaderOptions: &cos.ObjectPutHeaderOptions{
 			ContentType:   d.getContentType(),
-			ContentLength: len(content),
+			ContentLength: int64(len(content)),
 		},
 	}
 

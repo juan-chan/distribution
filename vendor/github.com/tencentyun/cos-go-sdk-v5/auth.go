@@ -1,24 +1,83 @@
 package cos
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha1"
+	"encoding/json"
 	"fmt"
 	"hash"
+	"io/ioutil"
+	math_rand "math/rand"
+	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 )
 
-const sha1SignAlgorithm = "sha1"
-const privateHeaderPrefix = "x-cos-"
-const defaultAuthExpire = time.Hour
+const (
+	sha1SignAlgorithm   = "sha1"
+	privateHeaderPrefix = "x-cos-"
+	defaultAuthExpire   = time.Hour
+)
+
+var (
+	defaultCVMAuthExpire = int64(600)
+	defaultCVMSchema     = "http"
+	defaultCVMMetaHost   = "metadata.tencentyun.com"
+	defaultCVMCredURI    = "latest/meta-data/cam/security-credentials"
+	internalHost         = regexp.MustCompile(`^.*cos-internal\.[a-z-1]+\.tencentcos\.cn$`)
+)
+
+var DNSScatterDialContext = DNSScatterDialContextFunc
+
+var DNSScatterTransport = &http.Transport{
+	Proxy:                 http.ProxyFromEnvironment,
+	DialContext:           DNSScatterDialContext,
+	MaxIdleConns:          100,
+	IdleConnTimeout:       90 * time.Second,
+	TLSHandshakeTimeout:   10 * time.Second,
+	ExpectContinueTimeout: 1 * time.Second,
+}
+
+func DNSScatterDialContextFunc(ctx context.Context, network string, addr string) (conn net.Conn, err error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	dialer := &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+		DualStack: true,
+	}
+	// DNS 打散
+	math_rand.Seed(time.Now().UnixNano())
+	start := math_rand.Intn(len(ips))
+	for i := start; i < len(ips); i++ {
+		conn, err = dialer.DialContext(ctx, network, net.JoinHostPort(ips[i].IP.String(), port))
+		if err == nil {
+			return
+		}
+	}
+	for i := 0; i < start; i++ {
+		conn, err = dialer.DialContext(ctx, network, net.JoinHostPort(ips[i].IP.String(), port))
+		if err == nil {
+			break
+		}
+	}
+	return
+}
 
 // 需要校验的 Headers 列表
-var needSignHeaders = map[string]bool{
+var NeedSignHeaders = map[string]bool{
 	"host":                           true,
 	"range":                          true,
 	"x-cos-acl":                      true,
@@ -37,15 +96,25 @@ var needSignHeaders = map[string]bool{
 	"content-type":                   true,
 	"content-length":                 true,
 	"content-md5":                    true,
+	"transfer-encoding":              true,
+	"versionid":                      true,
 	"expect":                         true,
 	"expires":                        true,
 	"x-cos-content-sha1":             true,
 	"x-cos-storage-class":            true,
+	"if-match":                       true,
 	"if-modified-since":              true,
+	"if-none-match":                  true,
+	"if-unmodified-since":            true,
 	"origin":                         true,
 	"access-control-request-method":  true,
 	"access-control-request-headers": true,
 	"x-cos-object-type":              true,
+}
+
+// 非线程安全，只能在进程初始化（而不是Client初始化）时做设置
+func SetNeedSignHeaders(key string, val bool) {
+	NeedSignHeaders[key] = val
 }
 
 func safeURLEncode(s string) string {
@@ -61,7 +130,7 @@ func safeURLEncode(s string) string {
 type valuesSignMap map[string][]string
 
 func (vs valuesSignMap) Add(key, value string) {
-	key = strings.ToLower(key)
+	key = strings.ToLower(safeURLEncode(key))
 	vs[key] = append(vs[key], value)
 }
 
@@ -79,7 +148,7 @@ func (vs valuesSignMap) Encode() string {
 		for _, val := range items {
 			pairs = append(
 				pairs,
-				fmt.Sprintf("%s=%s", safeURLEncode(k), safeURLEncode(val)))
+				fmt.Sprintf("%s=%s", k, safeURLEncode(val)))
 		}
 	}
 	return strings.Join(pairs, "&")
@@ -120,12 +189,14 @@ func (a *AuthTime) keyString() string {
 }
 
 // newAuthorization 通过一系列步骤生成最终需要的 Authorization 字符串
-func newAuthorization(secretID, secretKey string, req *http.Request, authTime *AuthTime) string {
+func newAuthorization(secretID, secretKey string, req *http.Request, authTime *AuthTime, signHost bool) string {
 	signTime := authTime.signString()
 	keyTime := authTime.keyString()
 	signKey := calSignKey(secretKey, keyTime)
 
-	req.Header.Set("Host", req.Host)
+	if signHost {
+		req.Header.Set("Host", req.Host)
+	}
 	formatHeaders := *new(string)
 	signedHeaderList := *new([]string)
 	formatHeaders, signedHeaderList = genFormatHeaders(req.Header)
@@ -148,7 +219,7 @@ func AddAuthorizationHeader(secretID, secretKey string, sessionToken string, req
 	}
 
 	auth := newAuthorization(secretID, secretKey, req,
-		authTime,
+		authTime, true,
 	)
 	if len(sessionToken) > 0 {
 		req.Header.Set("x-cos-security-token", sessionToken)
@@ -203,10 +274,9 @@ func genFormatString(method string, uri url.URL, formatParameters, formatHeaders
 func genFormatParameters(parameters url.Values) (formatParameters string, signedParameterList []string) {
 	ps := valuesSignMap{}
 	for key, values := range parameters {
-		key = strings.ToLower(key)
 		for _, value := range values {
 			ps.Add(key, value)
-			signedParameterList = append(signedParameterList, key)
+			signedParameterList = append(signedParameterList, strings.ToLower(safeURLEncode(key)))
 		}
 	}
 	//formatParameters = strings.ToLower(ps.Encode())
@@ -219,11 +289,10 @@ func genFormatParameters(parameters url.Values) (formatParameters string, signed
 func genFormatHeaders(headers http.Header) (formatHeaders string, signedHeaderList []string) {
 	hs := valuesSignMap{}
 	for key, values := range headers {
-		key = strings.ToLower(key)
-		for _, value := range values {
-			if isSignHeader(key) {
+		if isSignHeader(strings.ToLower(key)) {
+			for _, value := range values {
 				hs.Add(key, value)
-				signedHeaderList = append(signedHeaderList, key)
+				signedHeaderList = append(signedHeaderList, strings.ToLower(safeURLEncode(key)))
 			}
 		}
 	}
@@ -247,7 +316,7 @@ func calHMACDigest(key, msg, signMethod string) []byte {
 }
 
 func isSignHeader(key string) bool {
-	for k, v := range needSignHeaders {
+	for k, v := range NeedSignHeaders {
 		if key == k && v {
 			return true
 		}
@@ -285,22 +354,197 @@ func (t *AuthorizationTransport) GetCredential() (string, string, string) {
 // RoundTrip implements the RoundTripper interface.
 func (t *AuthorizationTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req = cloneRequest(req) // per RoundTrip contract
-	if t.Expire == time.Duration(0) {
-		t.Expire = defaultAuthExpire
-	}
 
 	ak, sk, token := t.GetCredential()
+	if strings.HasPrefix(ak, " ") || strings.HasSuffix(ak, " ") {
+		return nil, fmt.Errorf("SecretID is invalid")
+	}
+	if strings.HasPrefix(sk, " ") || strings.HasSuffix(sk, " ") {
+		return nil, fmt.Errorf("SecretKey is invalid")
+	}
+
 	// 增加 Authorization header
-	authTime := NewAuthTime(t.Expire)
+	authTime := NewAuthTime(defaultAuthExpire)
+	AddAuthorizationHeader(ak, sk, token, req, authTime)
+
+	resp, err := t.transport(req).RoundTrip(req)
+	return resp, err
+}
+
+func (t *AuthorizationTransport) transport(req *http.Request) http.RoundTripper {
+	if t.Transport != nil {
+		return t.Transport
+	}
+	// 内部域名默认使用DNS打散
+	if rc := internalHost.MatchString(req.URL.Hostname()); rc {
+		return DNSScatterTransport
+	}
+	return http.DefaultTransport
+}
+
+type CVMSecurityCredentials struct {
+	TmpSecretId  string `json:",omitempty"`
+	TmpSecretKey string `json:",omitempty"`
+	ExpiredTime  int64  `json:",omitempty"`
+	Expiration   string `json:",omitempty"`
+	Token        string `json:",omitempty"`
+	Code         string `json:",omitempty"`
+}
+
+type CVMCredentialTransport struct {
+	RoleName     string
+	Transport    http.RoundTripper
+	secretID     string
+	secretKey    string
+	sessionToken string
+	expiredTime  int64
+	rwLocker     sync.RWMutex
+}
+
+func (t *CVMCredentialTransport) GetRoles() ([]string, error) {
+	urlname := fmt.Sprintf("%s://%s/%s", defaultCVMSchema, defaultCVMMetaHost, defaultCVMCredURI)
+	resp, err := http.Get(urlname)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		bs, _ := ioutil.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get cvm security-credentials role failed, StatusCode: %v, Body: %v", resp.StatusCode, string(bs))
+	}
+	bs, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	roles := strings.Split(strings.TrimSpace(string(bs)), "\n")
+	if len(roles) == 0 {
+		return nil, fmt.Errorf("get cvm security-credentials role failed, No valid cam role was found")
+	}
+	return roles, nil
+}
+
+// https://cloud.tencent.com/document/product/213/4934
+func (t *CVMCredentialTransport) UpdateCredential(now int64) (string, string, string, error) {
+	t.rwLocker.Lock()
+	defer t.rwLocker.Unlock()
+	if t.expiredTime > now+defaultCVMAuthExpire {
+		return t.secretID, t.secretKey, t.sessionToken, nil
+	}
+	roleName := t.RoleName
+	if roleName == "" {
+		roles, err := t.GetRoles()
+		if err != nil {
+			return t.secretID, t.secretKey, t.sessionToken, err
+		}
+		roleName = roles[0]
+	}
+	urlname := fmt.Sprintf("%s://%s/%s/%s", defaultCVMSchema, defaultCVMMetaHost, defaultCVMCredURI, roleName)
+	resp, err := http.Get(urlname)
+	if err != nil {
+		return t.secretID, t.secretKey, t.sessionToken, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		bs, _ := ioutil.ReadAll(resp.Body)
+		return t.secretID, t.secretKey, t.sessionToken, fmt.Errorf("call cvm security-credentials failed, StatusCode: %v, Body: %v", resp.StatusCode, string(bs))
+	}
+	var cred CVMSecurityCredentials
+	err = json.NewDecoder(resp.Body).Decode(&cred)
+	if err != nil {
+		return t.secretID, t.secretKey, t.sessionToken, err
+	}
+	if cred.Code != "Success" {
+		return t.secretID, t.secretKey, t.sessionToken, fmt.Errorf("call cvm security-credentials failed, Code:%v", cred.Code)
+	}
+	t.secretID, t.secretKey, t.sessionToken, t.expiredTime = cred.TmpSecretId, cred.TmpSecretKey, cred.Token, cred.ExpiredTime
+	return t.secretID, t.secretKey, t.sessionToken, nil
+}
+
+func (t *CVMCredentialTransport) GetCredential() (string, string, string, error) {
+	now := time.Now().Unix()
+	t.rwLocker.RLock()
+	// 提前 defaultCVMAuthExpire 获取重新获取临时密钥
+	if t.expiredTime <= now+defaultCVMAuthExpire {
+		expiredTime := t.expiredTime
+		t.rwLocker.RUnlock()
+		secretID, secretKey, secretToken, err := t.UpdateCredential(now)
+		// 获取临时密钥失败但密钥未过期
+		if err != nil && now < expiredTime {
+			err = nil
+		}
+		return secretID, secretKey, secretToken, err
+	}
+	defer t.rwLocker.RUnlock()
+	return t.secretID, t.secretKey, t.sessionToken, nil
+}
+
+func (t *CVMCredentialTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	ak, sk, token, err := t.GetCredential()
+	if err != nil {
+		return nil, err
+	}
+	req = cloneRequest(req)
+	// 增加 Authorization header
+	authTime := NewAuthTime(defaultAuthExpire)
 	AddAuthorizationHeader(ak, sk, token, req, authTime)
 
 	resp, err := t.transport().RoundTrip(req)
 	return resp, err
 }
 
-func (t *AuthorizationTransport) transport() http.RoundTripper {
+func (t *CVMCredentialTransport) transport() http.RoundTripper {
 	if t.Transport != nil {
 		return t.Transport
 	}
 	return http.DefaultTransport
+}
+
+type CredentialTransport struct {
+	Transport  http.RoundTripper
+	Credential CredentialIface
+}
+
+func (t *CredentialTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	ak, sk, token := t.Credential.GetSecretId(), t.Credential.GetSecretKey(), t.Credential.GetToken()
+
+	req = cloneRequest(req)
+	// 增加 Authorization header
+	authTime := NewAuthTime(defaultAuthExpire)
+	AddAuthorizationHeader(ak, sk, token, req, authTime)
+
+	resp, err := t.transport().RoundTrip(req)
+	return resp, err
+}
+
+func (t *CredentialTransport) transport() http.RoundTripper {
+	if t.Transport != nil {
+		return t.Transport
+	}
+	return http.DefaultTransport
+}
+
+type CredentialIface interface {
+	GetSecretId() string
+	GetToken() string
+	GetSecretKey() string
+}
+
+func NewTokenCredential(secretId, secretKey, token string) *Credential {
+	return &Credential{
+		SecretID:     secretId,
+		SecretKey:    secretKey,
+		SessionToken: token,
+	}
+}
+
+func (c *Credential) GetSecretKey() string {
+	return c.SecretKey
+}
+
+func (c *Credential) GetSecretId() string {
+	return c.SecretID
+}
+
+func (c *Credential) GetToken() string {
+	return c.SessionToken
 }

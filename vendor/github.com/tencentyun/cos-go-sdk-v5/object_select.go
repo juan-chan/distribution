@@ -15,7 +15,7 @@ import (
 )
 
 type JSONInputSerialization struct {
-	Type string `xml:"Type"`
+	Type string `xml:"Type,omitempty"`
 }
 
 type CSVInputSerialization struct {
@@ -39,7 +39,7 @@ type JSONOutputSerialization struct {
 }
 
 type CSVOutputSerialization struct {
-	QuoteFileds          string `xml:"QuoteFileds,omitempty"`
+	QuoteFields          string `xml:"QuoteFields,omitempty"`
 	RecordDelimiter      string `xml:"RecordDelimiter,omitempty"`
 	FieldDelimiter       string `xml:"FieldDelimiter,omitempty"`
 	QuoteCharacter       string `xml:"QuoteCharacter,omitempty"`
@@ -401,7 +401,6 @@ func (osr *ObjectSelectResponse) fixedLengthRead(p []byte, read_timeout int64) (
 	timeout := time.Duration(read_timeout)
 	r := osr.Body
 	ch := make(chan chanReadIO, 1)
-	defer close(ch)
 	go func(p []byte) {
 		var needLen int
 		readChan := chanReadIO{}
@@ -412,6 +411,7 @@ func (osr *ObjectSelectResponse) fixedLengthRead(p []byte, read_timeout int64) (
 			if err != nil {
 				readChan.err = err
 				ch <- readChan
+				close(ch)
 				return
 			}
 
@@ -420,11 +420,12 @@ func (osr *ObjectSelectResponse) fixedLengthRead(p []byte, read_timeout int64) (
 			}
 		}
 		ch <- readChan
+		close(ch)
 	}(p)
 
 	select {
 	case <-time.After(time.Second * timeout):
-		return 0, fmt.Errorf("requestId: %s, readLen timeout, timeout is %d(second),need read:%d", "sr.Headers.Get(HTTPHeaderOssRequestID)", timeout, len(p))
+		return 0, fmt.Errorf("requestId: %s, readLen timeout, timeout is %d(second),need read:%d", osr.Headers.Get("x-cos-request-id"), timeout, len(p))
 	case result := <-ch:
 		return result.readLen, result.err
 	}
