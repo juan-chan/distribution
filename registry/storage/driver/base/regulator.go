@@ -165,7 +165,10 @@ func (r *regulator) Move(ctx context.Context, sourcePath string, destPath string
 }
 
 func (r *regulator) BackupAndDeleteWithHost(ctx context.Context, host, path string) error {
-	return r.Move(ctx, path, fmt.Sprintf("backup/%s", path))
+	r.enter()
+	defer r.exit()
+
+	return r.StorageDriver.BackupAndDeleteWithHost(ctx, host, path)
 }
 
 // Delete recursively deletes all objects stored at "path" and its subpaths.

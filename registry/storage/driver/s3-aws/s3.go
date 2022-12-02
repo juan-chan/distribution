@@ -741,10 +741,20 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 // object.
 func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) error {
 	/* This is terrible, but aws doesn't have an actual move. */
-	if err := d.copy(ctx, sourcePath, destPath); err != nil {
+	sourceStoragePath, err := d.storagePath(sourcePath, ctx)
+	if err != nil {
 		return err
 	}
-	return d.Delete(ctx, sourcePath)
+
+	destStoragePath, err := d.storagePath(destPath, ctx)
+	if err != nil {
+		return err
+	}
+
+	if err = d.copy(ctx, sourceStoragePath, destStoragePath); err != nil {
+		return err
+	}
+	return d.Delete(ctx, sourceStoragePath)
 }
 
 func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string) error {
@@ -752,30 +762,20 @@ func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string)
 	if err != nil {
 		return err
 	}
-	if err := d.copy(ctx, sourcePath, fmt.Sprintf("backup/%s", sourcePath)); err != nil {
+	if err = d.copy(ctx, sourcePath, fmt.Sprintf("backup/%s", sourcePath)); err != nil {
 		return err
 	}
 	return d.Delete(ctx, sourcePath)
 }
 
 // copy copies an object stored at sourcePath to destPath.
-func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) error {
-	sourceStoragePath, err := d.storagePath(sourcePath, ctx)
-	if err != nil {
-		return err
-	}
-	destStoragePath, err := d.storagePath(destPath, ctx)
-	if err != nil {
-		return err
-	}
-
+func (d *driver) copy(ctx context.Context, sourceStoragePath, destStoragePath string) error {
 	// S3 can copy objects up to 5 GB in size with a single PUT Object - Copy
 	// operation. For larger objects, the multipart upload API must be used.
 	//
 	// Empirically, multipart copy is fastest with 32 MB parts and is faster
 	// than PUT Object - Copy for objects larger than 32 MB.
-
-	fileInfo, err := d.Stat(ctx, sourcePath)
+	fileInfo, err := d.statWithCodingS3Path(ctx, sourceStoragePath)
 	if err != nil {
 		return parseError(sourceStoragePath, err)
 	}
@@ -857,6 +857,37 @@ func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) e
 		MultipartUpload: &s3.CompletedMultipartUpload{Parts: completedParts},
 	})
 	return err
+}
+
+func (d *driver) statWithCodingS3Path(ctx context.Context, storagePath string) (storagedriver.FileInfo, error) {
+	resp, err := d.S3.ListObjects(&s3.ListObjectsInput{
+		Bucket:  aws.String(d.Bucket),
+		Prefix:  aws.String(storagePath),
+		MaxKeys: aws.Int64(1),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	fi := storagedriver.FileInfoFields{
+		Path: storagePath,
+	}
+
+	if len(resp.Contents) == 1 {
+		if *resp.Contents[0].Key != storagePath {
+			fi.IsDir = true
+		} else {
+			fi.IsDir = false
+			fi.Size = *resp.Contents[0].Size
+			fi.ModTime = *resp.Contents[0].LastModified
+		}
+	} else if len(resp.CommonPrefixes) == 1 {
+		fi.IsDir = true
+	} else {
+		return nil, storagedriver.PathNotFoundError{Path: storagePath}
+	}
+
+	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
 }
 
 func min(a, b int) int {

@@ -638,21 +638,24 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 }
 
 func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) error {
-	// need to implement multi-part upload
-	err := d.copy(ctx, sourcePath, destPath)
+	parsedSourcePath, err := d.cosPath(sourcePath, ctx)
 	if err != nil {
-		return parseError(sourcePath, err)
+		return err
 	}
-
-	cosPath, err := d.cosPath(sourcePath, ctx)
-
+	parsedDestPath, err := d.cosPath(destPath, ctx)
 	if err != nil {
 		return err
 	}
 
-	_, err = d.Client.Object.Delete(ctx, cosPath)
+	// need to implement multi-part upload
+	err = d.copy(ctx, parsedSourcePath, parsedDestPath)
 	if err != nil {
-		return parseError(sourcePath, err)
+		return parseError(parsedSourcePath, err)
+	}
+
+	_, err = d.Client.Object.Delete(ctx, parsedSourcePath)
+	if err != nil {
+		return parseError(parsedSourcePath, err)
 	}
 	return nil
 }
@@ -1080,20 +1083,8 @@ func (d *driver) cosPathWithHost(ctx context.Context, host, subPath string) (str
 }
 
 // copy copies an object stored at sourcePath to destPath.
-func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) error {
-	fileInfo, err := d.Stat(ctx, sourcePath)
-	if err != nil {
-		return err
-	}
-
-	parsedSourcePath, err := d.cosPath(sourcePath, ctx)
-
-	if err != nil {
-		return err
-	}
-
-	parsedDestPath, err := d.cosPath(destPath, ctx)
-
+func (d *driver) copy(ctx context.Context, parsedSourcePath, parsedDestPath string) error {
+	fileInfo, err := d.statWithCodingCosPath(ctx, parsedSourcePath)
 	if err != nil {
 		return err
 	}
@@ -1130,7 +1121,7 @@ func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) e
 		go func() {
 			defer func() {
 				if err := recover(); err != nil {
-					logrus.Errorf("copy part sourcePath: %s destPath: %s error: %v", sourcePath, destPath, err)
+					logrus.Errorf("copy part sourcePath: %s destPath: %s error: %v", parsedSourcePath, parsedDestPath, err)
 				}
 			}()
 
@@ -1172,6 +1163,42 @@ func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) e
 		_, err = d.Client.Object.AbortMultipartUpload(ctx, parsedDestPath, createResp.UploadID)
 	}
 	return err
+}
+
+func (d *driver) statWithCodingCosPath(ctx context.Context, cosPath string) (storagedriver.FileInfo, error) {
+	opt := &cos.BucketGetOptions{
+		Prefix:  cosPath,
+		MaxKeys: 1,
+	}
+	listResponse, _, err := d.Client.Bucket.Get(ctx, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	fi := storagedriver.FileInfoFields{
+		Path: cosPath,
+	}
+
+	if len(listResponse.Contents) == 1 {
+		if listResponse.Contents[0].Key != cosPath {
+			fi.IsDir = true
+		} else {
+			fi.IsDir = false
+			fi.Size = int64(listResponse.Contents[0].Size)
+
+			timestamp, err := time.Parse(time.RFC3339Nano, listResponse.Contents[0].LastModified)
+			if err != nil {
+				return nil, err
+			}
+			fi.ModTime = timestamp
+		}
+	} else if len(listResponse.CommonPrefixes) == 1 {
+		fi.IsDir = true
+	} else {
+		return nil, storagedriver.PathNotFoundError{Path: cosPath}
+	}
+
+	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
 }
 
 func (d *driver) shouldUseCdn(ctx context.Context) bool {
