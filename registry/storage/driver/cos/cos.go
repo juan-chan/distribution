@@ -657,6 +657,24 @@ func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) e
 	return nil
 }
 
+func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string) error {
+	sourcePath, err := d.cosPathWithHost(ctx, host, path)
+	if err != nil {
+		return err
+	}
+
+	err = d.copy(ctx, sourcePath, fmt.Sprintf("backup/%s", sourcePath))
+	if err != nil {
+		return parseError(sourcePath, err)
+	}
+
+	_, err = d.Client.Object.Delete(ctx, sourcePath)
+	if err != nil {
+		return parseError(sourcePath, err)
+	}
+	return nil
+}
+
 func (d *driver) Delete(ctx context.Context, path string) error {
 	cosPath, err := d.cosPath(path, ctx)
 

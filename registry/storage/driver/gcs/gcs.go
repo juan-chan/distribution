@@ -2,7 +2,7 @@
 // store blobs in Google cloud storage.
 //
 // This package leverages the google.golang.org/cloud/storage client library
-//for interfacing with gcs.
+// for interfacing with gcs.
 //
 // Because gcs is a key, value store the Stat call does not support last modification
 // time for directories (directories are an abstraction for key, value stores)
@@ -10,6 +10,7 @@
 // Note that the contents of incomplete uploads are not accessible even though
 // Stat returns their length
 //
+//go:build include_gcs
 // +build include_gcs
 
 package gcs
@@ -638,7 +639,7 @@ func (d *driver) Stat(context context.Context, path string) (storagedriver.FileI
 }
 
 // List returns a list of the objects that are direct descendants of the
-//given path.
+// given path.
 func (d *driver) List(context context.Context, path string) ([]string, error) {
 	var query *storage.Query
 	query = &storage.Query{}
@@ -695,6 +696,10 @@ func (d *driver) Move(context context.Context, sourcePath string, destPath strin
 		logrus.Infof("error deleting file: %v due to %v", sourcePath, err)
 	}
 	return nil
+}
+
+func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string) error {
+	return d.Move(ctx, path, fmt.Sprintf("backup/%s", path))
 }
 
 // listAll recursively lists all names of objects stored at "prefix" and its subpaths.

@@ -747,6 +747,17 @@ func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) e
 	return d.Delete(ctx, sourcePath)
 }
 
+func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string) error {
+	sourcePath, err := d.storagePathWithHost(ctx, host, path)
+	if err != nil {
+		return err
+	}
+	if err := d.copy(ctx, sourcePath, fmt.Sprintf("backup/%s", sourcePath)); err != nil {
+		return err
+	}
+	return d.Delete(ctx, sourcePath)
+}
+
 // copy copies an object stored at sourcePath to destPath.
 func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) error {
 	sourceStoragePath, err := d.storagePath(sourcePath, ctx)

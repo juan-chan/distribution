@@ -306,6 +306,10 @@ func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) e
 	return srcBlobRef.Delete(nil)
 }
 
+func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string) error {
+	return d.Move(ctx, path, fmt.Sprintf("backup/%s", path))
+}
+
 // Delete recursively deletes all objects stored at "path" and its subpaths.
 func (d *driver) Delete(ctx context.Context, path string) error {
 	blobRef := d.client.GetContainerReference(d.container).GetBlobReference(path)

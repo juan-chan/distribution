@@ -318,6 +318,10 @@ func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) e
 	return err
 }
 
+func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string) error {
+	return d.Move(ctx, path, fmt.Sprintf("backup/%s", path))
+}
+
 // Delete recursively deletes all objects stored at "path" and its subpaths.
 func (d *driver) Delete(ctx context.Context, subPath string) error {
 
@@ -339,7 +343,7 @@ func (d *driver) Delete(ctx context.Context, subPath string) error {
 }
 
 // DeleteWithHost recursively deletes all objects stored at "path" and its subPaths with coding host.
-func (d *driver) DeleteWithHost(ctx context.Context, host, path string) error{
+func (d *driver) DeleteWithHost(ctx context.Context, host, path string) error {
 	fullPath, err := d.fullPathWithHost(ctx, host, path)
 	if err != nil {
 		return err
