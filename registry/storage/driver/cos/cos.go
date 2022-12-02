@@ -17,6 +17,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/juan-chan/distribution/registry/storage/driver/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tencentyun/cos-go-sdk-v5"
 
@@ -704,28 +705,28 @@ func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) e
 }
 
 func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string) error {
+	dcontext.GetLogger(ctx).Infof("COS: backup and delete with host, host: %s, path: %s", host, host)
 	sourcePath, err := d.cosPathWithHost(ctx, host, path)
 	if err != nil {
 		return err
 	}
+	dcontext.GetLogger(ctx).Infof("COS: backup and delete with host, sourcePath: %s", sourcePath)
 
 	sourceList, err := d.listWithCodingCosPath(ctx, sourcePath)
 	if err != nil {
 		return err
 	}
+	dcontext.GetLogger(ctx).Infof("COS: backup and delete with host, sourcePath: %s", sourcePath)
 
 	for _, filePath := range sourceList {
-		err = d.copy(ctx, filePath, fmt.Sprintf("backup/%s", filePath))
+		dcontext.GetLogger(ctx).Infof("COS: backup and delete with host, filePath: %s", filePath)
+		err = d.copy(ctx, filePath, util.GetBackupPath(filePath))
 		if err != nil {
 			return parseError(filePath, err)
 		}
 	}
 
-	_, err = d.Client.Object.Delete(ctx, sourcePath)
-	if err != nil {
-		return parseError(sourcePath, err)
-	}
-	return nil
+	return d.DeleteWithHost(ctx, host, path)
 }
 
 func (d *driver) Delete(ctx context.Context, path string) error {
@@ -1134,14 +1135,17 @@ func (d *driver) cosPathWithHost(ctx context.Context, host, subPath string) (str
 
 // copy copies an object stored at sourcePath to destPath.
 func (d *driver) copy(ctx context.Context, parsedSourcePath, parsedDestPath string) error {
+	dcontext.GetLogger(ctx).Infof("COS: backup and delete with host: copy, source: %s, dest: %s", parsedSourcePath, parsedDestPath)
 	fileInfo, err := d.statWithCodingCosPath(ctx, parsedSourcePath)
 	if err != nil {
 		return err
 	}
+	dcontext.GetLogger(ctx).Infof("COS: backup and delete with host: copy, fileInfo: %v", fileInfo)
 
 	sourceURL := fmt.Sprintf("%s/%s", d.Client.BaseURL.BucketURL.Host, parsedSourcePath)
 
 	if fileInfo.Size() <= multipartCopyThresholdSize {
+		dcontext.GetLogger(ctx).Infof("COS: backup and delete with host: copy, sourceURL: %s", sourceURL)
 		_, _, err := d.Client.Object.Copy(ctx, parsedDestPath, sourceURL, nil)
 		if err != nil {
 			return err

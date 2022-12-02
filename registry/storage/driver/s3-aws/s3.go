@@ -36,6 +36,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/juan-chan/distribution/registry/storage/driver/util"
 
 	dcontext "github.com/juan-chan/distribution/context"
 	"github.com/juan-chan/distribution/registry/client/transport"
@@ -794,17 +795,22 @@ func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) e
 }
 
 func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string) error {
+	dcontext.GetLogger(ctx).Infof("S3: backup and delete with host, host: %s, path: %s", host, host)
 	sourcePath, err := d.storagePathWithHost(ctx, host, path)
 	if err != nil {
 		return err
 	}
+	dcontext.GetLogger(ctx).Infof("S3: backup and delete with host, sourcePath: %s", sourcePath)
 
 	sourceList, err := d.listWithCodingS3Path(ctx, sourcePath)
 	if err != nil {
 		return err
 	}
+	dcontext.GetLogger(ctx).Infof("S3: backup and delete with host, sourcePath: %s", sourcePath)
+
 	for _, filePath := range sourceList {
-		if err = d.copy(ctx, filePath, fmt.Sprintf("backup/%s", filePath)); err != nil {
+		dcontext.GetLogger(ctx).Infof("S3: backup and delete with host, filePath: %s", filePath)
+		if err = d.copy(ctx, filePath, util.GetBackupPath(filePath)); err != nil {
 			return err
 		}
 	}
@@ -868,10 +874,12 @@ func (d *driver) copy(ctx context.Context, sourceStoragePath, destStoragePath st
 	//
 	// Empirically, multipart copy is fastest with 32 MB parts and is faster
 	// than PUT Object - Copy for objects larger than 32 MB.
+	dcontext.GetLogger(ctx).Infof("S3: backup and delete with host: copy, source: %s, dest: %s", sourceStoragePath, destStoragePath)
 	fileInfo, err := d.statWithCodingS3Path(ctx, sourceStoragePath)
 	if err != nil {
 		return parseError(sourceStoragePath, err)
 	}
+	dcontext.GetLogger(ctx).Infof("S3: backup and delete with host: copy, fileInfo: %v", fileInfo)
 
 	if fileInfo.Size() <= d.MultipartCopyThresholdSize {
 		_, err := d.S3.CopyObject(&s3.CopyObjectInput{
