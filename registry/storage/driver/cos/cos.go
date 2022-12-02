@@ -666,9 +666,16 @@ func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string)
 		return err
 	}
 
-	err = d.copy(ctx, sourcePath, fmt.Sprintf("backup/%s", sourcePath))
+	sourceList, err := d.List(ctx, sourcePath)
 	if err != nil {
-		return parseError(sourcePath, err)
+		return err
+	}
+
+	for _, filePath := range sourceList {
+		err = d.copy(ctx, filePath, fmt.Sprintf("backup/%s", filePath))
+		if err != nil {
+			return parseError(filePath, err)
+		}
 	}
 
 	_, err = d.Client.Object.Delete(ctx, sourcePath)
