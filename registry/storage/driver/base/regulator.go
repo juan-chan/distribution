@@ -144,8 +144,15 @@ func (r *regulator) Stat(ctx context.Context, path string) (storagedriver.FileIn
 	return r.StorageDriver.Stat(ctx, path)
 }
 
+func (r *regulator) StatWithHost(ctx context.Context, host, path string) (storagedriver.FileInfo, error) {
+	r.enter()
+	defer r.exit()
+
+	return r.StorageDriver.StatWithHost(ctx, host, path)
+}
+
 // List returns a list of the objects that are direct descendants of the
-//given path.
+// given path.
 func (r *regulator) List(ctx context.Context, path string) ([]string, error) {
 	r.enter()
 	defer r.exit()

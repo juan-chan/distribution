@@ -65,8 +65,10 @@ type StorageDriver interface {
 	// size in bytes and the creation time.
 	Stat(ctx context.Context, path string) (FileInfo, error)
 
+	StatWithHost(ctx context.Context, host, path string) (FileInfo, error)
+
 	// List returns a list of the objects that are direct descendants of the
-	//given path.
+	// given path.
 	List(ctx context.Context, path string) ([]string, error)
 
 	// Move moves an object stored at sourcePath to destPath, removing the

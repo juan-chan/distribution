@@ -259,6 +259,10 @@ func (d *driver) Stat(ctx context.Context, subPath string) (storagedriver.FileIn
 	}, nil
 }
 
+func (d *driver) StatWithHost(ctx context.Context, host, path string) (storagedriver.FileInfo, error) {
+	return d.Stat(ctx, path)
+}
+
 // List returns a list of the objects that are direct descendants of the given
 // path.
 func (d *driver) List(ctx context.Context, subPath string) ([]string, error) {
@@ -343,7 +347,7 @@ func (d *driver) Delete(ctx context.Context, subPath string) error {
 }
 
 // DeleteWithHost recursively deletes all objects stored at "path" and its subPaths with coding host.
-func (d *driver) DeleteWithHost(ctx context.Context, host, path string) error{
+func (d *driver) DeleteWithHost(ctx context.Context, host, path string) error {
 	fullPath, err := d.fullPathWithHost(ctx, host, path)
 	if err != nil {
 		return err

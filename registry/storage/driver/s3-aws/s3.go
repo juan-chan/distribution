@@ -664,6 +664,42 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
 }
 
+func (d *driver) StatWithHost(ctx context.Context, host, path string) (storagedriver.FileInfo, error) {
+	storagePath, err := d.storagePathWithHost(ctx, host, path)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := d.S3.ListObjects(&s3.ListObjectsInput{
+		Bucket:  aws.String(d.Bucket),
+		Prefix:  aws.String(storagePath),
+		MaxKeys: aws.Int64(1),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	fi := storagedriver.FileInfoFields{
+		Path: path,
+	}
+
+	if len(resp.Contents) == 1 {
+		if *resp.Contents[0].Key != storagePath {
+			fi.IsDir = true
+		} else {
+			fi.IsDir = false
+			fi.Size = *resp.Contents[0].Size
+			fi.ModTime = *resp.Contents[0].LastModified
+		}
+	} else if len(resp.CommonPrefixes) == 1 {
+		fi.IsDir = true
+	} else {
+		return nil, storagedriver.PathNotFoundError{Path: storagePath}
+	}
+
+	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
+}
+
 // List returns a list of the objects that are direct descendants of the given path.
 func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 	path := opath
@@ -763,7 +799,7 @@ func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string)
 		return err
 	}
 
-	sourceList, err := d.List(ctx, sourcePath)
+	sourceList, err := d.listWithCodingS3Path(ctx, sourcePath)
 	if err != nil {
 		return err
 	}
@@ -773,6 +809,56 @@ func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string)
 		}
 	}
 	return d.DeleteWithHost(ctx, host, path)
+}
+
+func (d *driver) listWithCodingS3Path(ctx context.Context, s3Path string) ([]string, error) {
+	if s3Path != "/" && s3Path[len(s3Path)-1] != '/' {
+		s3Path = s3Path + "/"
+	}
+
+	resp, err := d.S3.ListObjects(&s3.ListObjectsInput{
+		Bucket:    aws.String(d.Bucket),
+		Prefix:    aws.String(s3Path),
+		Delimiter: aws.String("/"),
+		MaxKeys:   aws.Int64(listMax),
+	})
+	if err != nil {
+		return nil, parseError(s3Path, err)
+	}
+
+	files := []string{}
+	directories := []string{}
+
+	for {
+		for _, key := range resp.Contents {
+			files = append(files, *key.Key)
+		}
+
+		if *resp.IsTruncated {
+			resp, err = d.S3.ListObjects(&s3.ListObjectsInput{
+				Bucket:    aws.String(d.Bucket),
+				Prefix:    aws.String(s3Path),
+				Delimiter: aws.String("/"),
+				MaxKeys:   aws.Int64(listMax),
+				Marker:    resp.NextMarker,
+			})
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			break
+		}
+	}
+
+	if s3Path != "/" {
+		if len(files) == 0 && len(directories) == 0 {
+			// Treat empty response as missing directory, since we don't actually
+			// have directories in s3.
+			return nil, storagedriver.PathNotFoundError{Path: s3Path}
+		}
+	}
+
+	return append(files, directories...), nil
 }
 
 // copy copies an object stored at sourcePath to destPath.

@@ -222,6 +222,10 @@ func (d *driver) Stat(ctx context.Context, subPath string) (storagedriver.FileIn
 	}, nil
 }
 
+func (d *driver) StatWithHost(ctx context.Context, host, path string) (storagedriver.FileInfo, error) {
+	return d.Stat(ctx, path)
+}
+
 // List returns a list of the objects that are direct descendants of the given
 // path.
 func (d *driver) List(ctx context.Context, subPath string) ([]string, error) {

@@ -637,6 +637,49 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
 }
 
+func (d *driver) StatWithHost(ctx context.Context, host, path string) (storagedriver.FileInfo, error) {
+
+	cosPath, err := d.cosPathWithHost(ctx, host, path)
+
+	if err != nil {
+		return nil, err
+	}
+
+	opt := &cos.BucketGetOptions{
+		Prefix:  cosPath,
+		MaxKeys: 1,
+	}
+	listResponse, _, err := d.Client.Bucket.Get(ctx, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	fi := storagedriver.FileInfoFields{
+		Path: path,
+	}
+
+	if len(listResponse.Contents) == 1 {
+		if listResponse.Contents[0].Key != cosPath {
+			fi.IsDir = true
+		} else {
+			fi.IsDir = false
+			fi.Size = int64(listResponse.Contents[0].Size)
+
+			timestamp, err := time.Parse(time.RFC3339Nano, listResponse.Contents[0].LastModified)
+			if err != nil {
+				return nil, err
+			}
+			fi.ModTime = timestamp
+		}
+	} else if len(listResponse.CommonPrefixes) == 1 {
+		fi.IsDir = true
+	} else {
+		return nil, storagedriver.PathNotFoundError{Path: cosPath}
+	}
+
+	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
+}
+
 func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) error {
 	parsedSourcePath, err := d.cosPath(sourcePath, ctx)
 	if err != nil {

@@ -112,7 +112,7 @@ func (v VacuumCoding) BackupAndRemoveManifest(host, name string, dgst digest.Dig
 			return err
 		}
 
-		_, err = v.driver.Stat(v.ctx, tagsPath)
+		_, err = v.driver.StatWithHost(v.ctx, host, tagsPath)
 		if err != nil {
 			switch err := err.(type) {
 			case driver.PathNotFoundError:

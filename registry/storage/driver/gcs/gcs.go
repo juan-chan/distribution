@@ -2,7 +2,7 @@
 // store blobs in Google cloud storage.
 //
 // This package leverages the google.golang.org/cloud/storage client library
-//for interfacing with gcs.
+// for interfacing with gcs.
 //
 // Because gcs is a key, value store the Stat call does not support last modification
 // time for directories (directories are an abstraction for key, value stores)
@@ -10,6 +10,7 @@
 // Note that the contents of incomplete uploads are not accessible even though
 // Stat returns their length
 //
+//go:build include_gcs
 // +build include_gcs
 
 package gcs
@@ -595,7 +596,7 @@ func retry(req request) error {
 // size in bytes and the creation time.
 func (d *driver) Stat(context context.Context, path string) (storagedriver.FileInfo, error) {
 	var fi storagedriver.FileInfoFields
-	//try to get as file
+	// try to get as file
 	gcsContext := d.context(context)
 	obj, err := storageStatObject(gcsContext, d.bucket, d.pathToKey(path))
 	if err == nil {
@@ -610,7 +611,7 @@ func (d *driver) Stat(context context.Context, path string) (storagedriver.FileI
 		}
 		return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
 	}
-	//try to get as folder
+	// try to get as folder
 	dirpath := d.pathToDirKey(path)
 
 	var query *storage.Query
@@ -637,8 +638,12 @@ func (d *driver) Stat(context context.Context, path string) (storagedriver.FileI
 	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
 }
 
+func (d *driver) StatWithHost(ctx context.Context, host, path string) (storagedriver.FileInfo, error) {
+	return d.Stat(ctx, path)
+}
+
 // List returns a list of the objects that are direct descendants of the
-//given path.
+// given path.
 func (d *driver) List(context context.Context, path string) ([]string, error) {
 	var query *storage.Query
 	query = &storage.Query{}
