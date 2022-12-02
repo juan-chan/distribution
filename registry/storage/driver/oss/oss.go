@@ -7,7 +7,6 @@
 // Because OSS is a key, value store the Stat call does not support last modification
 // time for directories (directories are an abstraction for key, value stores)
 //
-//go:build include_oss
 // +build include_oss
 
 package oss
@@ -43,7 +42,7 @@ const defaultTimeout = 2 * time.Minute // 2 minute timeout per chunk
 // listMax is the largest amount of objects you can request from OSS in a list call
 const listMax = 1000
 
-// DriverParameters A struct that encapsulates all of the driver parameters after all values have been set
+//DriverParameters A struct that encapsulates all of the driver parameters after all values have been set
 type DriverParameters struct {
 	AccessKeyID     string
 	AccessKeySecret string

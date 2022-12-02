@@ -83,7 +83,7 @@ func (v VacuumCoding) RemoveManifest(host, name string, dgst digest.Digest, tags
 	return v.driver.DeleteWithHost(v.ctx, host, manifestPath)
 }
 
-func (v VacuumCoding) MoveBlob(host, dgst string) error {
+func (v VacuumCoding) BackupAndRemoveBlob(host, dgst string) error {
 	d, err := digest.Parse(dgst)
 	if err != nil {
 		return err
@@ -104,7 +104,7 @@ func (v VacuumCoding) MoveBlob(host, dgst string) error {
 	return nil
 }
 
-func (v VacuumCoding) MoveManifest(host, name string, dgst digest.Digest, tags []string) error {
+func (v VacuumCoding) BackupAndRemoveManifest(host, name string, dgst digest.Digest, tags []string) error {
 	// remove a tag manifest reference, in case of not found continue to next one
 	for _, tag := range tags {
 		tagsPath, err := pathFor(manifestTagIndexEntryPathSpec{name: name, revision: dgst, tag: tag})
@@ -122,7 +122,7 @@ func (v VacuumCoding) MoveManifest(host, name string, dgst digest.Digest, tags [
 			}
 		}
 		dcontext.GetLogger(v.ctx).Infof("deleting manifest tag reference: %s, host: %s", tagsPath, host)
-		err = v.driver.DeleteWithHost(v.ctx, host, tagsPath)
+		err = v.driver.BackupAndDeleteWithHost(v.ctx, host, tagsPath)
 		if err != nil {
 			return err
 		}
