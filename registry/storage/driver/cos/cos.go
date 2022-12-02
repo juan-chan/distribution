@@ -666,7 +666,7 @@ func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string)
 		return err
 	}
 
-	sourceList, err := d.List(ctx, sourcePath)
+	sourceList, err := d.listWithCodingCosPath(ctx, sourcePath)
 	if err != nil {
 		return err
 	}
@@ -1206,6 +1206,64 @@ func (d *driver) statWithCodingCosPath(ctx context.Context, cosPath string) (sto
 	}
 
 	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
+}
+
+func (d *driver) listWithCodingCosPath(ctx context.Context, cosPath string) ([]string, error) {
+	if cosPath != "/" && cosPath[len(cosPath)-1] != '/' {
+		cosPath = cosPath + "/"
+	}
+
+	listResponse, _, err := d.Client.Bucket.Get(ctx, &cos.BucketGetOptions{
+		Prefix:    cosPath,
+		Delimiter: "/",
+		MaxKeys:   listMax,
+	})
+	if err != nil {
+		return nil, parseError(cosPath, err)
+	}
+
+	files := []string{}
+	directories := []string{}
+
+	for {
+		for _, key := range listResponse.Contents {
+			f := path.Base(key.Key)
+			files = append(files, path.Join(cosPath, f))
+		}
+
+		for _, commonPrefix := range listResponse.CommonPrefixes {
+			directories = append(directories, path.Join(cosPath, path.Base(commonPrefix)))
+		}
+
+		if listResponse.IsTruncated {
+			listResponse, _, err = d.Client.Bucket.Get(ctx, &cos.BucketGetOptions{
+				Prefix:    cosPath,
+				Delimiter: "/",
+				MaxKeys:   listMax,
+				Marker:    listResponse.NextMarker,
+			})
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			break
+		}
+	}
+
+	// This is to cover for the cases when the first key equal to cosPath.
+	if len(files) > 0 && files[0] == strings.Replace(cosPath, "/", "/", 1) {
+		files = files[1:]
+	}
+
+	if cosPath != "/" {
+		if len(files) == 0 && len(directories) == 0 {
+			// Treat empty response as missing directory, since we don't actually
+			// have directories in s3.
+			return nil, storagedriver.PathNotFoundError{Path: cosPath}
+		}
+	}
+
+	return append(files, directories...), nil
 }
 
 func (d *driver) shouldUseCdn(ctx context.Context) bool {
