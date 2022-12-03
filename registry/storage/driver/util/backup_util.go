@@ -17,7 +17,7 @@ func GetBackupPath(path string) string {
 	if index == -1 {
 		return fmt.Sprintf("%s_%s", "backup", path)
 	}
-	result := append(pathItem[:index], fmt.Sprintf("%s_%s", pathItem[index], "backup"))
+	result := append(pathItem[:index], fmt.Sprintf("%s/%s", pathItem[index], "backup"))
 	result = append(result, pathItem[index+1:]...)
 	return strings.Join(result, "/")
 }
