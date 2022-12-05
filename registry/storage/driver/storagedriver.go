@@ -65,8 +65,10 @@ type StorageDriver interface {
 	// size in bytes and the creation time.
 	Stat(ctx context.Context, path string) (FileInfo, error)
 
+	StatWithHost(ctx context.Context, host, path string) (FileInfo, error)
+
 	// List returns a list of the objects that are direct descendants of the
-	//given path.
+	// given path.
 	List(ctx context.Context, path string) ([]string, error)
 
 	// Move moves an object stored at sourcePath to destPath, removing the
@@ -80,6 +82,8 @@ type StorageDriver interface {
 
 	// DeleteWithHost recursively deletes all objects stored at "path" and its subPaths with coding host.
 	DeleteWithHost(ctx context.Context, host, path string) error
+
+	BackupAndDeleteWithHost(ctx context.Context, host, path string) error
 
 	// URLFor returns a URL which may be used to retrieve the content stored at
 	// the given path, possibly using the given options.

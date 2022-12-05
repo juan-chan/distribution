@@ -17,6 +17,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/juan-chan/distribution/registry/storage/driver/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tencentyun/cos-go-sdk-v5"
 
@@ -637,24 +638,95 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
 }
 
-func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) error {
-	// need to implement multi-part upload
-	err := d.copy(ctx, sourcePath, destPath)
+func (d *driver) StatWithHost(ctx context.Context, host, path string) (storagedriver.FileInfo, error) {
+
+	cosPath, err := d.cosPathWithHost(ctx, host, path)
+
 	if err != nil {
-		return parseError(sourcePath, err)
+		return nil, err
 	}
 
-	cosPath, err := d.cosPath(sourcePath, ctx)
+	opt := &cos.BucketGetOptions{
+		Prefix:  cosPath,
+		MaxKeys: 1,
+	}
+	listResponse, _, err := d.Client.Bucket.Get(ctx, opt)
+	if err != nil {
+		return nil, err
+	}
 
+	fi := storagedriver.FileInfoFields{
+		Path: path,
+	}
+
+	if len(listResponse.Contents) == 1 {
+		if listResponse.Contents[0].Key != cosPath {
+			fi.IsDir = true
+		} else {
+			fi.IsDir = false
+			fi.Size = int64(listResponse.Contents[0].Size)
+
+			timestamp, err := time.Parse(time.RFC3339Nano, listResponse.Contents[0].LastModified)
+			if err != nil {
+				return nil, err
+			}
+			fi.ModTime = timestamp
+		}
+	} else if len(listResponse.CommonPrefixes) == 1 {
+		fi.IsDir = true
+	} else {
+		return nil, storagedriver.PathNotFoundError{Path: cosPath}
+	}
+
+	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
+}
+
+func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) error {
+	parsedSourcePath, err := d.cosPath(sourcePath, ctx)
+	if err != nil {
+		return err
+	}
+	parsedDestPath, err := d.cosPath(destPath, ctx)
 	if err != nil {
 		return err
 	}
 
-	_, err = d.Client.Object.Delete(ctx, cosPath)
+	// need to implement multi-part upload
+	err = d.copy(ctx, parsedSourcePath, parsedDestPath)
 	if err != nil {
-		return parseError(sourcePath, err)
+		return parseError(parsedSourcePath, err)
+	}
+
+	_, err = d.Client.Object.Delete(ctx, parsedSourcePath)
+	if err != nil {
+		return parseError(parsedSourcePath, err)
 	}
 	return nil
+}
+
+func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string) error {
+	dcontext.GetLogger(ctx).Infof("COS: backup and delete with host, host: %s, path: %s", host, host)
+	sourcePath, err := d.cosPathWithHost(ctx, host, path)
+	if err != nil {
+		return err
+	}
+	dcontext.GetLogger(ctx).Infof("COS: backup and delete with host, sourcePath: %s", sourcePath)
+
+	sourceList, err := d.listWithCodingCosPath(ctx, sourcePath)
+	if err != nil {
+		return err
+	}
+	dcontext.GetLogger(ctx).Infof("COS: backup and delete with host, sourcePath: %s", sourcePath)
+
+	for _, filePath := range sourceList {
+		dcontext.GetLogger(ctx).Infof("COS: backup and delete with host, filePath: %s", filePath)
+		err = d.copy(ctx, filePath, util.GetBackupPath(filePath))
+		if err != nil {
+			return parseError(filePath, err)
+		}
+	}
+
+	return d.DeleteWithHost(ctx, host, path)
 }
 
 func (d *driver) Delete(ctx context.Context, path string) error {
@@ -1062,27 +1134,18 @@ func (d *driver) cosPathWithHost(ctx context.Context, host, subPath string) (str
 }
 
 // copy copies an object stored at sourcePath to destPath.
-func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) error {
-	fileInfo, err := d.Stat(ctx, sourcePath)
+func (d *driver) copy(ctx context.Context, parsedSourcePath, parsedDestPath string) error {
+	dcontext.GetLogger(ctx).Infof("COS: backup and delete with host: copy, source: %s, dest: %s", parsedSourcePath, parsedDestPath)
+	fileInfo, err := d.statWithCodingCosPath(ctx, parsedSourcePath)
 	if err != nil {
 		return err
 	}
-
-	parsedSourcePath, err := d.cosPath(sourcePath, ctx)
-
-	if err != nil {
-		return err
-	}
-
-	parsedDestPath, err := d.cosPath(destPath, ctx)
-
-	if err != nil {
-		return err
-	}
+	dcontext.GetLogger(ctx).Infof("COS: backup and delete with host: copy, fileInfo: %v", fileInfo)
 
 	sourceURL := fmt.Sprintf("%s/%s", d.Client.BaseURL.BucketURL.Host, parsedSourcePath)
 
 	if fileInfo.Size() <= multipartCopyThresholdSize {
+		dcontext.GetLogger(ctx).Infof("COS: backup and delete with host: copy, sourceURL: %s", sourceURL)
 		_, _, err := d.Client.Object.Copy(ctx, parsedDestPath, sourceURL, nil)
 		if err != nil {
 			return err
@@ -1112,7 +1175,7 @@ func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) e
 		go func() {
 			defer func() {
 				if err := recover(); err != nil {
-					logrus.Errorf("copy part sourcePath: %s destPath: %s error: %v", sourcePath, destPath, err)
+					logrus.Errorf("copy part sourcePath: %s destPath: %s error: %v", parsedSourcePath, parsedDestPath, err)
 				}
 			}()
 
@@ -1154,6 +1217,100 @@ func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) e
 		_, err = d.Client.Object.AbortMultipartUpload(ctx, parsedDestPath, createResp.UploadID)
 	}
 	return err
+}
+
+func (d *driver) statWithCodingCosPath(ctx context.Context, cosPath string) (storagedriver.FileInfo, error) {
+	opt := &cos.BucketGetOptions{
+		Prefix:  cosPath,
+		MaxKeys: 1,
+	}
+	listResponse, _, err := d.Client.Bucket.Get(ctx, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	fi := storagedriver.FileInfoFields{
+		Path: cosPath,
+	}
+
+	if len(listResponse.Contents) == 1 {
+		if listResponse.Contents[0].Key != cosPath {
+			fi.IsDir = true
+		} else {
+			fi.IsDir = false
+			fi.Size = int64(listResponse.Contents[0].Size)
+
+			timestamp, err := time.Parse(time.RFC3339Nano, listResponse.Contents[0].LastModified)
+			if err != nil {
+				return nil, err
+			}
+			fi.ModTime = timestamp
+		}
+	} else if len(listResponse.CommonPrefixes) == 1 {
+		fi.IsDir = true
+	} else {
+		return nil, storagedriver.PathNotFoundError{Path: cosPath}
+	}
+
+	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
+}
+
+func (d *driver) listWithCodingCosPath(ctx context.Context, cosPath string) ([]string, error) {
+	if cosPath != "/" && cosPath[len(cosPath)-1] != '/' {
+		cosPath = cosPath + "/"
+	}
+
+	listResponse, _, err := d.Client.Bucket.Get(ctx, &cos.BucketGetOptions{
+		Prefix:    cosPath,
+		Delimiter: "/",
+		MaxKeys:   listMax,
+	})
+	if err != nil {
+		return nil, parseError(cosPath, err)
+	}
+
+	files := []string{}
+	directories := []string{}
+
+	for {
+		for _, key := range listResponse.Contents {
+			f := path.Base(key.Key)
+			files = append(files, path.Join(cosPath, f))
+		}
+
+		for _, commonPrefix := range listResponse.CommonPrefixes {
+			directories = append(directories, path.Join(cosPath, path.Base(commonPrefix)))
+		}
+
+		if listResponse.IsTruncated {
+			listResponse, _, err = d.Client.Bucket.Get(ctx, &cos.BucketGetOptions{
+				Prefix:    cosPath,
+				Delimiter: "/",
+				MaxKeys:   listMax,
+				Marker:    listResponse.NextMarker,
+			})
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			break
+		}
+	}
+
+	// This is to cover for the cases when the first key equal to cosPath.
+	if len(files) > 0 && files[0] == strings.Replace(cosPath, "/", "/", 1) {
+		files = files[1:]
+	}
+
+	if cosPath != "/" {
+		if len(files) == 0 && len(directories) == 0 {
+			// Treat empty response as missing directory, since we don't actually
+			// have directories in s3.
+			return nil, storagedriver.PathNotFoundError{Path: cosPath}
+		}
+	}
+
+	return append(files, directories...), nil
 }
 
 func (d *driver) shouldUseCdn(ctx context.Context) bool {

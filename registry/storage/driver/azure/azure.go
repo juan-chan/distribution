@@ -270,6 +270,10 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 	return nil, storagedriver.PathNotFoundError{Path: path}
 }
 
+func (d *driver) StatWithHost(ctx context.Context, host, path string) (storagedriver.FileInfo, error) {
+	return d.Stat(ctx, path)
+}
+
 // List returns a list of the objects that are direct descendants of the given
 // path.
 func (d *driver) List(ctx context.Context, path string) ([]string, error) {
@@ -304,6 +308,10 @@ func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) e
 	}
 
 	return srcBlobRef.Delete(nil)
+}
+
+func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string) error {
+	return d.Move(ctx, path, fmt.Sprintf("backup/%s", path))
 }
 
 // Delete recursively deletes all objects stored at "path" and its subpaths.

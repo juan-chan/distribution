@@ -36,6 +36,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/juan-chan/distribution/registry/storage/driver/util"
 
 	dcontext "github.com/juan-chan/distribution/context"
 	"github.com/juan-chan/distribution/registry/client/transport"
@@ -664,6 +665,42 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
 }
 
+func (d *driver) StatWithHost(ctx context.Context, host, path string) (storagedriver.FileInfo, error) {
+	storagePath, err := d.storagePathWithHost(ctx, host, path)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := d.S3.ListObjects(&s3.ListObjectsInput{
+		Bucket:  aws.String(d.Bucket),
+		Prefix:  aws.String(storagePath),
+		MaxKeys: aws.Int64(1),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	fi := storagedriver.FileInfoFields{
+		Path: path,
+	}
+
+	if len(resp.Contents) == 1 {
+		if *resp.Contents[0].Key != storagePath {
+			fi.IsDir = true
+		} else {
+			fi.IsDir = false
+			fi.Size = *resp.Contents[0].Size
+			fi.ModTime = *resp.Contents[0].LastModified
+		}
+	} else if len(resp.CommonPrefixes) == 1 {
+		fi.IsDir = true
+	} else {
+		return nil, storagedriver.PathNotFoundError{Path: storagePath}
+	}
+
+	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
+}
+
 // List returns a list of the objects that are direct descendants of the given path.
 func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 	path := opath
@@ -741,33 +778,108 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 // object.
 func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) error {
 	/* This is terrible, but aws doesn't have an actual move. */
-	if err := d.copy(ctx, sourcePath, destPath); err != nil {
-		return err
-	}
-	return d.Delete(ctx, sourcePath)
-}
-
-// copy copies an object stored at sourcePath to destPath.
-func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) error {
 	sourceStoragePath, err := d.storagePath(sourcePath, ctx)
 	if err != nil {
 		return err
 	}
+
 	destStoragePath, err := d.storagePath(destPath, ctx)
 	if err != nil {
 		return err
 	}
 
+	if err = d.copy(ctx, sourceStoragePath, destStoragePath); err != nil {
+		return err
+	}
+	return d.Delete(ctx, sourceStoragePath)
+}
+
+func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string) error {
+	dcontext.GetLogger(ctx).Infof("S3: backup and delete with host, host: %s, path: %s", host, host)
+	sourcePath, err := d.storagePathWithHost(ctx, host, path)
+	if err != nil {
+		return err
+	}
+	dcontext.GetLogger(ctx).Infof("S3: backup and delete with host, sourcePath: %s", sourcePath)
+
+	sourceList, err := d.listWithCodingS3Path(ctx, sourcePath)
+	if err != nil {
+		return err
+	}
+	dcontext.GetLogger(ctx).Infof("S3: backup and delete with host, sourcePath: %s", sourcePath)
+
+	for _, filePath := range sourceList {
+		dcontext.GetLogger(ctx).Infof("S3: backup and delete with host, filePath: %s", filePath)
+		if err = d.copy(ctx, filePath, util.GetBackupPath(filePath)); err != nil {
+			return err
+		}
+	}
+	return d.DeleteWithHost(ctx, host, path)
+}
+
+func (d *driver) listWithCodingS3Path(ctx context.Context, s3Path string) ([]string, error) {
+	if s3Path != "/" && s3Path[len(s3Path)-1] != '/' {
+		s3Path = s3Path + "/"
+	}
+
+	resp, err := d.S3.ListObjects(&s3.ListObjectsInput{
+		Bucket:    aws.String(d.Bucket),
+		Prefix:    aws.String(s3Path),
+		Delimiter: aws.String("/"),
+		MaxKeys:   aws.Int64(listMax),
+	})
+	if err != nil {
+		return nil, parseError(s3Path, err)
+	}
+
+	files := []string{}
+	directories := []string{}
+
+	for {
+		for _, key := range resp.Contents {
+			files = append(files, *key.Key)
+		}
+
+		if *resp.IsTruncated {
+			resp, err = d.S3.ListObjects(&s3.ListObjectsInput{
+				Bucket:    aws.String(d.Bucket),
+				Prefix:    aws.String(s3Path),
+				Delimiter: aws.String("/"),
+				MaxKeys:   aws.Int64(listMax),
+				Marker:    resp.NextMarker,
+			})
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			break
+		}
+	}
+
+	if s3Path != "/" {
+		if len(files) == 0 && len(directories) == 0 {
+			// Treat empty response as missing directory, since we don't actually
+			// have directories in s3.
+			return nil, storagedriver.PathNotFoundError{Path: s3Path}
+		}
+	}
+
+	return append(files, directories...), nil
+}
+
+// copy copies an object stored at sourcePath to destPath.
+func (d *driver) copy(ctx context.Context, sourceStoragePath, destStoragePath string) error {
 	// S3 can copy objects up to 5 GB in size with a single PUT Object - Copy
 	// operation. For larger objects, the multipart upload API must be used.
 	//
 	// Empirically, multipart copy is fastest with 32 MB parts and is faster
 	// than PUT Object - Copy for objects larger than 32 MB.
-
-	fileInfo, err := d.Stat(ctx, sourcePath)
+	dcontext.GetLogger(ctx).Infof("S3: backup and delete with host: copy, source: %s, dest: %s", sourceStoragePath, destStoragePath)
+	fileInfo, err := d.statWithCodingS3Path(ctx, sourceStoragePath)
 	if err != nil {
 		return parseError(sourceStoragePath, err)
 	}
+	dcontext.GetLogger(ctx).Infof("S3: backup and delete with host: copy, fileInfo: %v", fileInfo)
 
 	if fileInfo.Size() <= d.MultipartCopyThresholdSize {
 		_, err := d.S3.CopyObject(&s3.CopyObjectInput{
@@ -846,6 +958,37 @@ func (d *driver) copy(ctx context.Context, sourcePath string, destPath string) e
 		MultipartUpload: &s3.CompletedMultipartUpload{Parts: completedParts},
 	})
 	return err
+}
+
+func (d *driver) statWithCodingS3Path(ctx context.Context, storagePath string) (storagedriver.FileInfo, error) {
+	resp, err := d.S3.ListObjects(&s3.ListObjectsInput{
+		Bucket:  aws.String(d.Bucket),
+		Prefix:  aws.String(storagePath),
+		MaxKeys: aws.Int64(1),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	fi := storagedriver.FileInfoFields{
+		Path: storagePath,
+	}
+
+	if len(resp.Contents) == 1 {
+		if *resp.Contents[0].Key != storagePath {
+			fi.IsDir = true
+		} else {
+			fi.IsDir = false
+			fi.Size = *resp.Contents[0].Size
+			fi.ModTime = *resp.Contents[0].LastModified
+		}
+	} else if len(resp.CommonPrefixes) == 1 {
+		fi.IsDir = true
+	} else {
+		return nil, storagedriver.PathNotFoundError{Path: storagePath}
+	}
+
+	return storagedriver.FileInfoInternal{FileInfoFields: fi}, nil
 }
 
 func min(a, b int) int {
