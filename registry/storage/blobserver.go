@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/registry/storage/driver"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/registry/storage/driver"
 )
 
 // TODO(stevvooe): This should configurable in the future.

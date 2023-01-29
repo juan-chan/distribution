@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juan-chan/distribution/configuration"
-	_ "github.com/juan-chan/distribution/registry/storage/driver/inmemory"
+	"github.com/reedchan7/distribution/configuration"
+	_ "github.com/reedchan7/distribution/registry/storage/driver/inmemory"
 )
 
 // Tests to ensure nextProtos returns the correct protocols when:

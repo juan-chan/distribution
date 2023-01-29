@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/manifest"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/manifest"
 )
 
 var (

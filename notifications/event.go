@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/juan-chan/distribution"
 	events "github.com/docker/go-events"
+	"github.com/reedchan7/distribution"
 )
 
 // EventAction constants used in action field of Event.

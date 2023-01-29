@@ -2,7 +2,7 @@ ARG GO_VERSION=1.13.8
 
 FROM coding-public-docker.pkg.coding.net/public/docker/golang:${GO_VERSION}-alpine3.11 AS build
 
-ENV DISTRIBUTION_DIR /go/src/github.com/juan-chan/distribution
+ENV DISTRIBUTION_DIR /go/src/github.com/reedchan7/distribution
 ENV BUILDTAGS include_oss include_cos include_gcs
 ENV GO_BUILD_FLAGS -mod=vendor
 
@@ -30,7 +30,7 @@ RUN set -ex \
 
 COPY cmd/registry/config-dev.yml /etc/docker/registry/config.yml
 COPY start-server.sh /etc/docker/registry/start-server.sh
-COPY --from=build /go/src/github.com/juan-chan/distribution/bin/registry /bin/registry
+COPY --from=build /go/src/github.com/reedchan7/distribution/bin/registry /bin/registry
 COPY --from=build /usr/local/go/lib/time/zoneinfo.zip /opt
 
 RUN mkdir /usr/share/zoneinfo \

@@ -3,14 +3,14 @@ package testutil
 import (
 	"fmt"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/manifest"
-	"github.com/juan-chan/distribution/manifest/manifestlist"
-	"github.com/juan-chan/distribution/manifest/schema1"
-	"github.com/juan-chan/distribution/manifest/schema2"
 	"github.com/docker/libtrust"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/manifest"
+	"github.com/reedchan7/distribution/manifest/manifestlist"
+	"github.com/reedchan7/distribution/manifest/schema1"
+	"github.com/reedchan7/distribution/manifest/schema2"
 )
 
 // MakeManifestList constructs a manifest list out of a list of manifest digests

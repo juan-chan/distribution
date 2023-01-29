@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	pb "github.com/juan-chan/distribution/registry/auth/authserver/proto"
-	"github.com/juan-chan/distribution/registry/grpc"
+	pb "github.com/reedchan7/distribution/registry/auth/authserver/proto"
+	"github.com/reedchan7/distribution/registry/grpc"
 )
 
 func CheckTag(connPool *grpc.ConnPool, address, host, repo, tag string) (*pb.DockerCheckTagResponse, error) {

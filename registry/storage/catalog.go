@@ -7,8 +7,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/juan-chan/distribution/reference"
-	"github.com/juan-chan/distribution/registry/storage/driver"
+	"github.com/reedchan7/distribution/reference"
+	"github.com/reedchan7/distribution/registry/storage/driver"
 )
 
 // Returns a list, or partial list, of repositories in the registry.

@@ -1,3 +1,4 @@
+//go:build !noresumabledigest
 // +build !noresumabledigest
 
 package storage
@@ -10,7 +11,7 @@ import (
 	"path"
 	"strconv"
 
-	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
+	storagedriver "github.com/reedchan7/distribution/registry/storage/driver"
 	"github.com/sirupsen/logrus"
 )
 

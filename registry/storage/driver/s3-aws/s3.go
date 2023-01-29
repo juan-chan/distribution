@@ -36,15 +36,15 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/juan-chan/distribution/registry/storage/driver/util"
+	"github.com/reedchan7/distribution/registry/storage/driver/util"
 
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/registry/client/transport"
-	"github.com/juan-chan/distribution/registry/grpc"
-	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
-	"github.com/juan-chan/distribution/registry/storage/driver/base"
-	"github.com/juan-chan/distribution/registry/storage/driver/factory"
-	"github.com/juan-chan/distribution/registry/storage/manager"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/registry/client/transport"
+	"github.com/reedchan7/distribution/registry/grpc"
+	storagedriver "github.com/reedchan7/distribution/registry/storage/driver"
+	"github.com/reedchan7/distribution/registry/storage/driver/base"
+	"github.com/reedchan7/distribution/registry/storage/driver/factory"
+	"github.com/reedchan7/distribution/registry/storage/manager"
 )
 
 const driverName = "s3aws"

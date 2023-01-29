@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/registry/storage"
-	"github.com/juan-chan/distribution/registry/storage/driver/factory"
-	"github.com/juan-chan/distribution/version"
 	"github.com/docker/libtrust"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/registry/storage"
+	"github.com/reedchan7/distribution/registry/storage/driver/factory"
+	"github.com/reedchan7/distribution/version"
 	"github.com/spf13/cobra"
 )
 

@@ -4,11 +4,11 @@ import (
 	"context"
 	"regexp"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/reference"
-	"github.com/juan-chan/distribution/registry/storage/cache"
-	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
 	"github.com/docker/libtrust"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/reference"
+	"github.com/reedchan7/distribution/registry/storage/cache"
+	storagedriver "github.com/reedchan7/distribution/registry/storage/driver"
 )
 
 // registry is the top-level implementation of Registry for use in the storage

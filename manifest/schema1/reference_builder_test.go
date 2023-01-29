@@ -3,11 +3,11 @@ package schema1
 import (
 	"testing"
 
-	"github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/manifest"
-	"github.com/juan-chan/distribution/reference"
 	"github.com/docker/libtrust"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/manifest"
+	"github.com/reedchan7/distribution/reference"
 )
 
 func makeSignedManifest(t *testing.T, pk libtrust.PrivateKey, refs []Reference) *SignedManifest {

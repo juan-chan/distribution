@@ -4,12 +4,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/reference"
-	"github.com/juan-chan/distribution/uuid"
-	events "github.com/docker/go-events"
+	"github.com/docker/go-events"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/reference"
+	"github.com/reedchan7/distribution/uuid"
 )
 
 type bridge struct {

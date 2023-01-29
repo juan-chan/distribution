@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/registry/grpc"
-	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
-	"github.com/juan-chan/distribution/registry/storage/driver/base"
-	"github.com/juan-chan/distribution/registry/storage/driver/factory"
-	"github.com/juan-chan/distribution/registry/storage/manager"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/registry/grpc"
+	storagedriver "github.com/reedchan7/distribution/registry/storage/driver"
+	"github.com/reedchan7/distribution/registry/storage/driver/base"
+	"github.com/reedchan7/distribution/registry/storage/driver/factory"
+	"github.com/reedchan7/distribution/registry/storage/manager"
 )
 
 const (

@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/reference"
-	"github.com/juan-chan/distribution/registry/storage/driver"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/reference"
+	"github.com/reedchan7/distribution/registry/storage/driver"
 )
 
 func emit(format string, a ...interface{}) {

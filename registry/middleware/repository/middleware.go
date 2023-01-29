@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/juan-chan/distribution"
+	"github.com/reedchan7/distribution"
 )
 
 // InitFunc is the type of a RepositoryMiddleware factory function and is

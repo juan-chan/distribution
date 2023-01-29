@@ -7,12 +7,12 @@ import (
 	"path"
 	"time"
 
-	"github.com/juan-chan/distribution"
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/reference"
-	"github.com/juan-chan/distribution/registry/storage/driver"
-	"github.com/juan-chan/distribution/uuid"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/reference"
+	"github.com/reedchan7/distribution/registry/storage/driver"
+	"github.com/reedchan7/distribution/uuid"
 )
 
 // linkPathFunc describes a function that can resolve a link based on the

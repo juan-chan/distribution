@@ -1,17 +1,16 @@
 package main
 
 import (
+	_ "crypto/sha256"
+	_ "crypto/sha512"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
 
-	"github.com/juan-chan/distribution/version"
 	"github.com/opencontainers/go-digest"
-
-	_ "crypto/sha256"
-	_ "crypto/sha512"
+	"github.com/reedchan7/distribution/version"
 )
 
 var (

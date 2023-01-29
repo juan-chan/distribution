@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
+	storagedriver "github.com/reedchan7/distribution/registry/storage/driver"
 	"gopkg.in/check.v1"
 )
 

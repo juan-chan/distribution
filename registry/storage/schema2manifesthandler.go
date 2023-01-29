@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/juan-chan/distribution"
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/manifest/schema1"
-	"github.com/juan-chan/distribution/manifest/schema2"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/manifest/schema1"
+	"github.com/reedchan7/distribution/manifest/schema2"
 )
 
 var (
@@ -18,7 +18,7 @@ var (
 	errInvalidURL = errors.New("invalid URL on layer")
 )
 
-//schema2ManifestHandler is a ManifestHandler that covers schema2 manifests.
+// schema2ManifestHandler is a ManifestHandler that covers schema2 manifests.
 type schema2ManifestHandler struct {
 	repository   distribution.Repository
 	blobStore    distribution.BlobStore

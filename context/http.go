@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juan-chan/distribution/uuid"
 	"github.com/gorilla/mux"
+	"github.com/reedchan7/distribution/uuid"
 	log "github.com/sirupsen/logrus"
 )
 

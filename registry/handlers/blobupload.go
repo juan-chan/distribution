@@ -5,14 +5,14 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/juan-chan/distribution"
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/reference"
-	"github.com/juan-chan/distribution/registry/api/errcode"
-	v2 "github.com/juan-chan/distribution/registry/api/v2"
-	"github.com/juan-chan/distribution/registry/storage"
 	"github.com/gorilla/handlers"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/reference"
+	"github.com/reedchan7/distribution/registry/api/errcode"
+	v2 "github.com/reedchan7/distribution/registry/api/v2"
+	"github.com/reedchan7/distribution/registry/storage"
 )
 
 // blobUploadDispatcher constructs and returns the blob upload handler for the

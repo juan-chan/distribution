@@ -8,7 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 
-	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
+	storagedriver "github.com/reedchan7/distribution/registry/storage/driver"
 )
 
 // TODO(stevvooe): Set an optimal buffer size here. We'll have to

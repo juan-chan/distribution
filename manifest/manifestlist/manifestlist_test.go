@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/juan-chan/distribution"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/reedchan7/distribution"
 )
 
 var expectedManifestListSerialization = []byte(`{

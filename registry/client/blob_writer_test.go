@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/registry/api/errcode"
-	v2 "github.com/juan-chan/distribution/registry/api/v2"
-	"github.com/juan-chan/distribution/testutil"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/registry/api/errcode"
+	v2 "github.com/reedchan7/distribution/registry/api/v2"
+	"github.com/reedchan7/distribution/testutil"
 )
 
 // Test implements distribution.BlobWriter

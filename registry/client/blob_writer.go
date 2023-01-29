@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/juan-chan/distribution"
+	"github.com/reedchan7/distribution"
 )
 
 type httpBlobUpload struct {

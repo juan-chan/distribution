@@ -1,9 +1,10 @@
+//go:build noresumabledigest
 // +build noresumabledigest
 
 package storage
 
 import (
-	"github.com/juan-chan/distribution/context"
+	"github.com/reedchan7/distribution/context"
 )
 
 // resumeHashAt is a noop when resumable digest support is disabled.

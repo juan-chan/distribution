@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juan-chan/distribution/registry/storage/cache/cachecheck"
 	"github.com/garyburd/redigo/redis"
+	"github.com/reedchan7/distribution/registry/storage/cache/cachecheck"
 )
 
 var redisAddr string

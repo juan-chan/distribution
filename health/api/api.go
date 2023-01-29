@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/juan-chan/distribution/health"
+	"github.com/reedchan7/distribution/health"
 )
 
 var (

@@ -3,8 +3,8 @@ package schema2
 import (
 	"context"
 
-	"github.com/juan-chan/distribution"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
 )
 
 // builder is a type for constructing manifests.

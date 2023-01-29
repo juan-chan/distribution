@@ -14,9 +14,9 @@ import (
 	"strings"
 	"text/template"
 
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/registry/auth"
 	"github.com/docker/libtrust"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/registry/auth"
 )
 
 // accessSet maps a typed, named resource to

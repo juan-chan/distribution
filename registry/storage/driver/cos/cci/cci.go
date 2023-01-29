@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/juan-chan/distribution/registry/grpc"
-	pb "github.com/juan-chan/distribution/registry/storage/driver/cos/cci/proto"
+	"github.com/reedchan7/distribution/registry/grpc"
+	pb "github.com/reedchan7/distribution/registry/storage/driver/cos/cci/proto"
 )
 
 func HasCvmIp(connPool *grpc.ConnPool, address, ip string) (bool, error) {

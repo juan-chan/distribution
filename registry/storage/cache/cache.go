@@ -5,7 +5,7 @@ package cache
 import (
 	"fmt"
 
-	"github.com/juan-chan/distribution"
+	"github.com/reedchan7/distribution"
 )
 
 // BlobDescriptorCacheProvider provides repository scoped

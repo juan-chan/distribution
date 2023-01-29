@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/juan-chan/distribution/registry/api/errcode"
-	"github.com/juan-chan/distribution/registry/storage/driver"
 	"github.com/gorilla/handlers"
+	"github.com/reedchan7/distribution/registry/api/errcode"
+	"github.com/reedchan7/distribution/registry/storage/driver"
 )
 
 const maximumReturnedEntries = 100

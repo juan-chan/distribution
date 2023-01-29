@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/juan-chan/distribution/reference"
 	"github.com/gorilla/mux"
+	"github.com/reedchan7/distribution/reference"
 )
 
 // URLBuilder creates registry API urls from a single base endpoint. It can be

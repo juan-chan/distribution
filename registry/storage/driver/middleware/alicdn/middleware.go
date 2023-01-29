@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	dcontext "github.com/juan-chan/distribution/context"
-	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
-	storagemiddleware "github.com/juan-chan/distribution/registry/storage/driver/middleware"
+	dcontext "github.com/reedchan7/distribution/context"
+	storagedriver "github.com/reedchan7/distribution/registry/storage/driver"
+	storagemiddleware "github.com/reedchan7/distribution/registry/storage/driver/middleware"
 
 	"github.com/denverdino/aliyungo/cdn/auth"
 )

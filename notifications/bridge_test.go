@@ -3,14 +3,14 @@ package notifications
 import (
 	"testing"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/manifest/schema1"
-	"github.com/juan-chan/distribution/reference"
-	v2 "github.com/juan-chan/distribution/registry/api/v2"
-	"github.com/juan-chan/distribution/uuid"
-	events "github.com/docker/go-events"
+	"github.com/docker/go-events"
 	"github.com/docker/libtrust"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/manifest/schema1"
+	"github.com/reedchan7/distribution/reference"
+	v2 "github.com/reedchan7/distribution/registry/api/v2"
+	"github.com/reedchan7/distribution/uuid"
 )
 
 var (

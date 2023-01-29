@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juan-chan/distribution/manifest/schema1"
-	events "github.com/docker/go-events"
+	"github.com/docker/go-events"
+	"github.com/reedchan7/distribution/manifest/schema1"
 )
 
 // TestHTTPSink mocks out an http endpoint and notifies it under a couple of

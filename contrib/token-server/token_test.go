@@ -5,13 +5,12 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
-	"strings"
-
-	"github.com/juan-chan/distribution/registry/auth"
 	"github.com/docker/libtrust"
+	"github.com/reedchan7/distribution/registry/auth"
 )
 
 func TestCreateJWTSuccessWithEmptyACL(t *testing.T) {
@@ -74,7 +73,7 @@ func joseBase64Decode(s string) (string, error) {
 	}
 	data, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
-		return "", err //errors.New("Error in Decoding base64 String")
+		return "", err // errors.New("Error in Decoding base64 String")
 	}
 	return string(data), nil
 }

@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/registry/storage/cache"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/registry/storage/cache"
 )
 
 // CheckBlobDescriptorCache takes a cache implementation through a common set

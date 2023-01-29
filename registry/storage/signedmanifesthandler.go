@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/juan-chan/distribution"
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/manifest/schema1"
-	"github.com/juan-chan/distribution/reference"
 	"github.com/docker/libtrust"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/manifest/schema1"
+	"github.com/reedchan7/distribution/reference"
 )
 
 // signedManifestHandler is a ManifestHandler that covers schema1 manifests. It

@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/juan-chan/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/reedchan7/distribution/reference"
 )
 
 var (

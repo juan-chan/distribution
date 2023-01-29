@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	dcontext "github.com/juan-chan/distribution/context"
+	dcontext "github.com/reedchan7/distribution/context"
 )
 
 const (

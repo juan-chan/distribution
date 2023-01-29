@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/registry/api/errcode"
+	"github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/registry/api/errcode"
 )
 
 // A Registry is a collection of checks. Most applications will use the global

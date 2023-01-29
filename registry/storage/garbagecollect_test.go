@@ -5,14 +5,14 @@ import (
 	"path"
 	"testing"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/reference"
-	"github.com/juan-chan/distribution/registry/storage/driver"
-	"github.com/juan-chan/distribution/registry/storage/driver/inmemory"
-	"github.com/juan-chan/distribution/testutil"
 	"github.com/docker/libtrust"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/reference"
+	"github.com/reedchan7/distribution/registry/storage/driver"
+	"github.com/reedchan7/distribution/registry/storage/driver/inmemory"
+	"github.com/reedchan7/distribution/testutil"
 )
 
 type image struct {

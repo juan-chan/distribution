@@ -6,9 +6,9 @@ import (
 	mrand "math/rand"
 	"testing"
 
-	"github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/registry/storage/driver/inmemory"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/registry/storage/driver/inmemory"
 )
 
 func TestSimpleRead(t *testing.T) {

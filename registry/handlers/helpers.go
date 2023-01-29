@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	dcontext "github.com/juan-chan/distribution/context"
+	dcontext "github.com/reedchan7/distribution/context"
 )
 
 // closeResources closes all the provided resources after running the target

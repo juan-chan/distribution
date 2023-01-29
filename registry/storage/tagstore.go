@@ -4,9 +4,9 @@ import (
 	"context"
 	"path"
 
-	"github.com/juan-chan/distribution"
-	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	storagedriver "github.com/reedchan7/distribution/registry/storage/driver"
 )
 
 var _ distribution.TagService = &tagStore{}

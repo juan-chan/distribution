@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juan-chan/distribution/registry/storage/driver"
-	"github.com/juan-chan/distribution/registry/storage/driver/inmemory"
-	"github.com/juan-chan/distribution/uuid"
+	"github.com/reedchan7/distribution/registry/storage/driver"
+	"github.com/reedchan7/distribution/registry/storage/driver/inmemory"
+	"github.com/reedchan7/distribution/uuid"
 )
 
 func testUploadFS(t *testing.T, numUploads int, repoName string, startedAt time.Time) (driver.StorageDriver, context.Context) {

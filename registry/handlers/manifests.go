@@ -11,17 +11,17 @@ import (
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/juan-chan/distribution"
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/manifest/manifestlist"
-	"github.com/juan-chan/distribution/manifest/ocischema"
-	"github.com/juan-chan/distribution/manifest/schema1"
-	"github.com/juan-chan/distribution/manifest/schema2"
-	"github.com/juan-chan/distribution/reference"
-	"github.com/juan-chan/distribution/registry/api/errcode"
-	v2 "github.com/juan-chan/distribution/registry/api/v2"
-	"github.com/juan-chan/distribution/registry/auth"
-	"github.com/juan-chan/distribution/registry/auth/authserver"
+	"github.com/reedchan7/distribution"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/manifest/manifestlist"
+	"github.com/reedchan7/distribution/manifest/ocischema"
+	"github.com/reedchan7/distribution/manifest/schema1"
+	"github.com/reedchan7/distribution/manifest/schema2"
+	"github.com/reedchan7/distribution/reference"
+	"github.com/reedchan7/distribution/registry/api/errcode"
+	v2 "github.com/reedchan7/distribution/registry/api/v2"
+	"github.com/reedchan7/distribution/registry/auth"
+	"github.com/reedchan7/distribution/registry/auth/authserver"
 )
 
 // These constants determine which architecture and OS to choose from a

@@ -4,11 +4,11 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/juan-chan/distribution"
+	"github.com/reedchan7/distribution"
 
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/reference"
 	"github.com/opencontainers/go-digest"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/reference"
 )
 
 // ManifestListener describes a set of methods for listening to events related to manifests.

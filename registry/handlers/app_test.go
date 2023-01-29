@@ -8,15 +8,15 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/juan-chan/distribution/configuration"
-	"github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/registry/api/errcode"
-	v2 "github.com/juan-chan/distribution/registry/api/v2"
-	"github.com/juan-chan/distribution/registry/auth"
-	_ "github.com/juan-chan/distribution/registry/auth/silly"
-	"github.com/juan-chan/distribution/registry/storage"
-	memorycache "github.com/juan-chan/distribution/registry/storage/cache/memory"
-	"github.com/juan-chan/distribution/registry/storage/driver/testdriver"
+	"github.com/reedchan7/distribution/configuration"
+	"github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/registry/api/errcode"
+	v2 "github.com/reedchan7/distribution/registry/api/v2"
+	"github.com/reedchan7/distribution/registry/auth"
+	_ "github.com/reedchan7/distribution/registry/auth/silly"
+	"github.com/reedchan7/distribution/registry/storage"
+	memorycache "github.com/reedchan7/distribution/registry/storage/cache/memory"
+	"github.com/reedchan7/distribution/registry/storage/driver/testdriver"
 )
 
 // TestAppDispatcher builds an application with a test dispatcher and ensures

@@ -5,17 +5,17 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/manifest"
-	"github.com/juan-chan/distribution/manifest/schema1"
-	"github.com/juan-chan/distribution/reference"
-	"github.com/juan-chan/distribution/registry/storage"
-	"github.com/juan-chan/distribution/registry/storage/cache/memory"
-	"github.com/juan-chan/distribution/registry/storage/driver/inmemory"
-	"github.com/juan-chan/distribution/testutil"
 	"github.com/docker/libtrust"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/manifest"
+	"github.com/reedchan7/distribution/manifest/schema1"
+	"github.com/reedchan7/distribution/reference"
+	"github.com/reedchan7/distribution/registry/storage"
+	"github.com/reedchan7/distribution/registry/storage/cache/memory"
+	"github.com/reedchan7/distribution/registry/storage/driver/inmemory"
+	"github.com/reedchan7/distribution/testutil"
 )
 
 func TestListener(t *testing.T) {

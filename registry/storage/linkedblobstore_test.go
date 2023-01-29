@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/reference"
-	"github.com/juan-chan/distribution/testutil"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/reference"
+	"github.com/reedchan7/distribution/testutil"
 )
 
 func TestLinkedBlobStoreEnumerator(t *testing.T) {

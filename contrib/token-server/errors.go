@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/juan-chan/distribution/registry/api/errcode"
+	"github.com/reedchan7/distribution/registry/api/errcode"
 )
 
 var (

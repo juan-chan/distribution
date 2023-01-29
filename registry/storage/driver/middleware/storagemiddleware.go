@@ -3,7 +3,7 @@ package storagemiddleware
 import (
 	"fmt"
 
-	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
+	storagedriver "github.com/reedchan7/distribution/registry/storage/driver"
 )
 
 // InitFunc is the type of a StorageMiddleware factory function and is

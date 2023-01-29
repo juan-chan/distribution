@@ -4,10 +4,10 @@ import (
 	"context"
 	"path"
 
-	"github.com/juan-chan/distribution"
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/registry/storage/driver"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/registry/storage/driver"
 )
 
 // blobStore implements the read side of the blob store interface over a

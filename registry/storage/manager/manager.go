@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/juan-chan/distribution/registry/grpc"
-	pb "github.com/juan-chan/distribution/registry/storage/manager/storage-path"
+	"github.com/reedchan7/distribution/registry/grpc"
+	pb "github.com/reedchan7/distribution/registry/storage/manager/storage-path"
 )
 
 func GetStoragePath(connPool *grpc.ConnPool, address, host, subPath string) (string, error) {

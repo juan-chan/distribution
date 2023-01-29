@@ -3,7 +3,7 @@ package memory
 import (
 	"testing"
 
-	"github.com/juan-chan/distribution/registry/storage/cache/cachecheck"
+	"github.com/reedchan7/distribution/registry/storage/cache/cachecheck"
 )
 
 // TestInMemoryBlobInfoCache checks the in memory implementation is working

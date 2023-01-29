@@ -6,10 +6,6 @@
 //
 // Because OSS is a key, value store the Stat call does not support last modification
 // time for directories (directories are an abstraction for key, value stores)
-//
-//go:build include_oss
-// +build include_oss
-
 package oss
 
 import (
@@ -19,17 +15,28 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	pathlib "path"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/denverdino/aliyungo/oss"
-	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
-	"github.com/juan-chan/distribution/registry/storage/driver/base"
-	"github.com/juan-chan/distribution/registry/storage/driver/factory"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/registry/grpc"
+	storagedriver "github.com/reedchan7/distribution/registry/storage/driver"
+	"github.com/reedchan7/distribution/registry/storage/driver/base"
+	"github.com/reedchan7/distribution/registry/storage/driver/factory"
+	"github.com/reedchan7/distribution/registry/storage/manager"
 	"github.com/sirupsen/logrus"
 )
+
+/*
+Documentation:
+- [Official Docker Registry Configuration](https://docs.docker.com/registry/configuration/#storage)
+- [Official Docker Registry OSS Parameters](https://github.com/docker/docs/blob/main/registry/storage-drivers/oss.md)
+- [OSS Client SDK](https://github.com/denverdino/aliyungo)
+*/
 
 const driverName = "oss"
 
@@ -45,17 +52,18 @@ const listMax = 1000
 
 // DriverParameters A struct that encapsulates all of the driver parameters after all values have been set
 type DriverParameters struct {
-	AccessKeyID     string
-	AccessKeySecret string
-	Bucket          string
-	Region          oss.Region
-	Internal        bool
-	Encrypt         bool
-	Secure          bool
-	ChunkSize       int64
-	RootDirectory   string
-	Endpoint        string
-	EncryptionKeyID string
+	AccessKeyID           string
+	AccessKeySecret       string
+	Bucket                string
+	Region                oss.Region
+	Internal              bool
+	Encrypt               bool
+	Secure                bool
+	ChunkSize             int64
+	RootDirectory         string
+	Endpoint              string
+	EncryptionKeyID       string
+	StorageManagerAddress string
 }
 
 func init() {
@@ -70,12 +78,16 @@ func (factory *ossDriverFactory) Create(parameters map[string]interface{}) (stor
 }
 
 type driver struct {
-	Client          *oss.Client
-	Bucket          *oss.Bucket
-	ChunkSize       int64
-	Encrypt         bool
-	RootDirectory   string
-	EncryptionKeyID string
+	Client                *oss.Client
+	Bucket                *oss.Bucket
+	ChunkSize             int64
+	Encrypt               bool
+	RootDirectory         string
+	EncryptionKeyID       string
+	StorageManagerAddress string
+
+	// grpcConnPool is a gRPC client connection pool.
+	grpcConnPool *grpc.ConnPool
 }
 
 type baseEmbed struct {
@@ -182,18 +194,21 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		endpoint = ""
 	}
 
+	storageManagerAddress := parameters["smaddress"]
+
 	params := DriverParameters{
-		AccessKeyID:     fmt.Sprint(accessKey),
-		AccessKeySecret: fmt.Sprint(secretKey),
-		Bucket:          fmt.Sprint(bucket),
-		Region:          oss.Region(fmt.Sprint(regionName)),
-		ChunkSize:       chunkSize,
-		RootDirectory:   fmt.Sprint(rootDirectory),
-		Encrypt:         encryptBool,
-		Secure:          secureBool,
-		Internal:        internalBool,
-		Endpoint:        fmt.Sprint(endpoint),
-		EncryptionKeyID: fmt.Sprint(encryptionKeyID),
+		AccessKeyID:           fmt.Sprint(accessKey),
+		AccessKeySecret:       fmt.Sprint(secretKey),
+		Bucket:                fmt.Sprint(bucket),
+		Region:                oss.Region(fmt.Sprint(regionName)),
+		ChunkSize:             chunkSize,
+		RootDirectory:         fmt.Sprint(rootDirectory),
+		Encrypt:               encryptBool,
+		Secure:                secureBool,
+		Internal:              internalBool,
+		Endpoint:              fmt.Sprint(endpoint),
+		EncryptionKeyID:       fmt.Sprint(encryptionKeyID),
+		StorageManagerAddress: fmt.Sprint(storageManagerAddress),
 	}
 
 	return New(params)
@@ -218,12 +233,14 @@ func New(params DriverParameters) (*Driver, error) {
 	// if you initiated a new OSS client while another one is running on the same bucket.
 
 	d := &driver{
-		Client:          client,
-		Bucket:          bucket,
-		ChunkSize:       params.ChunkSize,
-		Encrypt:         params.Encrypt,
-		RootDirectory:   params.RootDirectory,
-		EncryptionKeyID: params.EncryptionKeyID,
+		Client:                client,
+		Bucket:                bucket,
+		ChunkSize:             params.ChunkSize,
+		Encrypt:               params.Encrypt,
+		RootDirectory:         params.RootDirectory,
+		EncryptionKeyID:       params.EncryptionKeyID,
+		StorageManagerAddress: params.StorageManagerAddress,
+		grpcConnPool:          grpc.NewConnPool(),
 	}
 
 	return &Driver{
@@ -243,7 +260,11 @@ func (d *driver) Name() string {
 
 // GetContent retrieves the content stored at "path" as a []byte.
 func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
-	content, err := d.Bucket.Get(d.ossPath(path))
+	ossPath, err := d.ossPath(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	content, err := d.Bucket.Get(ossPath)
 	if err != nil {
 		return nil, parseError(path, err)
 	}
@@ -252,7 +273,11 @@ func (d *driver) GetContent(ctx context.Context, path string) ([]byte, error) {
 
 // PutContent stores the []byte content at a location designated by "path".
 func (d *driver) PutContent(ctx context.Context, path string, contents []byte) error {
-	return parseError(path, d.Bucket.Put(d.ossPath(path), contents, d.getContentType(), getPermissions(), d.getOptions()))
+	ossPath, err := d.ossPath(ctx, path)
+	if err != nil {
+		return err
+	}
+	return parseError(path, d.Bucket.Put(ossPath, contents, d.getContentType(), getPermissions(), d.getOptions()))
 }
 
 // Reader retrieves an io.ReadCloser for the content stored at "path" with a
@@ -261,7 +286,11 @@ func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.Read
 	headers := make(http.Header)
 	headers.Add("Range", "bytes="+strconv.FormatInt(offset, 10)+"-")
 
-	resp, err := d.Bucket.GetResponseWithHeaders(d.ossPath(path), headers)
+	ossPath, err := d.ossPath(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := d.Bucket.GetResponseWithHeaders(ossPath, headers)
 	if err != nil {
 		return nil, parseError(path, err)
 	}
@@ -281,7 +310,10 @@ func (d *driver) Reader(ctx context.Context, path string, offset int64) (io.Read
 // Writer returns a FileWriter which will store the content written to it
 // at the location designated by "path" after the call to Commit.
 func (d *driver) Writer(ctx context.Context, path string, append bool) (storagedriver.FileWriter, error) {
-	key := d.ossPath(path)
+	key, err := d.ossPath(ctx, path)
+	if err != nil {
+		return nil, err
+	}
 	if !append {
 		// TODO (brianbland): cancel other uploads at this path
 		multi, err := d.Bucket.InitMulti(key, d.getContentType(), getPermissions(), d.getOptions())
@@ -314,7 +346,11 @@ func (d *driver) Writer(ctx context.Context, path string, append bool) (storaged
 // Stat retrieves the FileInfo for the given path, including the current size
 // in bytes and the creation time.
 func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo, error) {
-	listResponse, err := d.Bucket.List(d.ossPath(path), "", "", 1)
+	ossPath, err := d.ossPath(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	listResponse, err := d.Bucket.List(ossPath, "", "", 1)
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +360,7 @@ func (d *driver) Stat(ctx context.Context, path string) (storagedriver.FileInfo,
 	}
 
 	if len(listResponse.Contents) == 1 {
-		if listResponse.Contents[0].Key != d.ossPath(path) {
+		if listResponse.Contents[0].Key != ossPath {
 			fi.IsDir = true
 		} else {
 			fi.IsDir = false
@@ -360,11 +396,19 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 	// In those cases, there is no root prefix to replace and we must actually add a "/" to all
 	// results in order to keep them as valid paths as recognized by storagedriver.PathRegexp
 	prefix := ""
-	if d.ossPath("") == "" {
+	rootOssPath, err := d.ossPath(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+	if rootOssPath == "" {
 		prefix = "/"
 	}
 
-	ossPath := d.ossPath(path)
+	ossPath, err := d.ossPath(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+
 	listResponse, err := d.Bucket.List(ossPath, "/", "", listMax)
 	if err != nil {
 		return nil, parseError(opath, err)
@@ -375,11 +419,11 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 
 	for {
 		for _, key := range listResponse.Contents {
-			files = append(files, strings.Replace(key.Key, d.ossPath(""), prefix, 1))
+			files = append(files, strings.Replace(key.Key, rootOssPath, prefix, 1))
 		}
 
 		for _, commonPrefix := range listResponse.CommonPrefixes {
-			directories = append(directories, strings.Replace(commonPrefix[0:len(commonPrefix)-1], d.ossPath(""), prefix, 1))
+			directories = append(directories, strings.Replace(commonPrefix[0:len(commonPrefix)-1], rootOssPath, prefix, 1))
 		}
 
 		if listResponse.IsTruncated {
@@ -393,7 +437,7 @@ func (d *driver) List(ctx context.Context, opath string) ([]string, error) {
 	}
 
 	// This is to cover for the cases when the first key equal to ossPath.
-	if len(files) > 0 && files[0] == strings.Replace(ossPath, d.ossPath(""), prefix, 1) {
+	if len(files) > 0 && files[0] == strings.Replace(ossPath, rootOssPath, prefix, 1) {
 		files = files[1:]
 	}
 
@@ -413,14 +457,23 @@ const maxConcurrency = 10
 // Move moves an object stored at sourcePath to destPath, removing the original
 // object.
 func (d *driver) Move(ctx context.Context, sourcePath string, destPath string) error {
-	logrus.Infof("Move from %s to %s", d.ossPath(sourcePath), d.ossPath(destPath))
-	err := d.Bucket.CopyLargeFileInParallel(d.ossPath(sourcePath), d.ossPath(destPath),
+	ossSourcePath, err := d.ossPath(ctx, sourcePath)
+	if err != nil {
+		return err
+	}
+	ossDestPath, err := d.ossPath(ctx, destPath)
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("Move from %s to %s", ossSourcePath, ossDestPath)
+	err = d.Bucket.CopyLargeFileInParallel(ossSourcePath, ossDestPath,
 		d.getContentType(),
 		getPermissions(),
 		d.getOptions(),
 		maxConcurrency)
 	if err != nil {
-		logrus.Errorf("Failed for move from %s to %s: %v", d.ossPath(sourcePath), d.ossPath(destPath), err)
+		logrus.Errorf("Failed for move from %s to %s: %v", ossSourcePath, ossDestPath, err)
 		return parseError(sourcePath, err)
 	}
 
@@ -433,7 +486,10 @@ func (d *driver) BackupAndDeleteWithHost(ctx context.Context, host, path string)
 
 // Delete recursively deletes all objects stored at "path" and its subpaths.
 func (d *driver) Delete(ctx context.Context, path string) error {
-	ossPath := d.ossPath(path)
+	ossPath, err := d.ossPath(ctx, path)
+	if err != nil {
+		return err
+	}
 	listResponse, err := d.Bucket.List(ossPath, "", "", listMax)
 	if err != nil || len(listResponse.Contents) == 0 {
 		return storagedriver.PathNotFoundError{Path: path}
@@ -461,7 +517,7 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 			return nil
 		}
 
-		listResponse, err = d.Bucket.List(d.ossPath(path), "", "", listMax)
+		listResponse, err = d.Bucket.List(ossPath, "", "", listMax)
 		if err != nil {
 			return err
 		}
@@ -496,8 +552,12 @@ func (d *driver) URLFor(ctx context.Context, path string, options map[string]int
 			expiresTime = et
 		}
 	}
-	logrus.Infof("methodString: %s, expiresTime: %v", methodString, expiresTime)
-	signedURL := d.Bucket.SignedURLWithMethod(methodString, d.ossPath(path), expiresTime, nil, nil)
+	ossPath, err := d.ossPath(ctx, path)
+	if err != nil {
+		return "", err
+	}
+	logrus.Infof("methodString: %s, expiresTime: %v, ossPath: %s", methodString, expiresTime, ossPath)
+	signedURL := d.Bucket.SignedURLWithMethod(methodString, ossPath, expiresTime, nil, nil)
 	logrus.Infof("signed URL: %s", signedURL)
 	return signedURL, nil
 }
@@ -508,8 +568,23 @@ func (d *driver) Walk(ctx context.Context, path string, f storagedriver.WalkFn) 
 	return storagedriver.WalkFallback(ctx, d, path, f)
 }
 
-func (d *driver) ossPath(path string) string {
-	return strings.TrimLeft(strings.TrimRight(d.RootDirectory, "/")+path, "/")
+func (d *driver) ossPath(ctx context.Context, subPath string) (string, error) {
+	if d.StorageManagerAddress != "" {
+		storagePath, err := manager.GetStoragePath(d.grpcConnPool,
+			d.StorageManagerAddress,
+			dcontext.GetStringValue(ctx, "http.request.host"),
+			subPath)
+		if err != nil {
+			return "", fmt.Errorf("get storage path failed: %v", err)
+		}
+		return d.resolvePath(storagePath), nil
+	}
+	// return strings.TrimLeft(strings.TrimRight(d.RootDirectory, "/")+subPath, "/"), nil
+	return d.resolvePath(subPath), nil
+}
+
+func (d *driver) resolvePath(path string) string {
+	return strings.Trim(pathlib.Join(d.RootDirectory, path), "/")
 }
 
 func parseError(path string, err error) error {

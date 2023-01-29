@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/registry/api/errcode"
-	"github.com/juan-chan/distribution/registry/auth"
-	_ "github.com/juan-chan/distribution/registry/auth/htpasswd"
 	"github.com/docker/libtrust"
 	"github.com/gorilla/mux"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/registry/api/errcode"
+	"github.com/reedchan7/distribution/registry/auth"
+	_ "github.com/reedchan7/distribution/registry/auth/htpasswd"
 	"github.com/sirupsen/logrus"
 )
 

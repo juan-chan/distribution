@@ -5,12 +5,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/manifest"
-	"github.com/juan-chan/distribution/manifest/schema2"
-	"github.com/juan-chan/distribution/reference"
-	"github.com/juan-chan/distribution/registry/storage/driver/inmemory"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/manifest"
+	"github.com/reedchan7/distribution/manifest/schema2"
+	"github.com/reedchan7/distribution/reference"
+	"github.com/reedchan7/distribution/registry/storage/driver/inmemory"
 )
 
 type tagsTestEnv struct {

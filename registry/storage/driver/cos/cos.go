@@ -17,18 +17,18 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/juan-chan/distribution/registry/storage/driver/util"
+	"github.com/reedchan7/distribution/registry/storage/driver/util"
 	"github.com/sirupsen/logrus"
 	"github.com/tencentyun/cos-go-sdk-v5"
 
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/registry/grpc"
-	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
-	"github.com/juan-chan/distribution/registry/storage/driver/base"
-	"github.com/juan-chan/distribution/registry/storage/driver/cos/cci"
-	"github.com/juan-chan/distribution/registry/storage/driver/cos/cdn"
-	"github.com/juan-chan/distribution/registry/storage/driver/factory"
-	"github.com/juan-chan/distribution/registry/storage/manager"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/registry/grpc"
+	storagedriver "github.com/reedchan7/distribution/registry/storage/driver"
+	"github.com/reedchan7/distribution/registry/storage/driver/base"
+	"github.com/reedchan7/distribution/registry/storage/driver/cos/cci"
+	"github.com/reedchan7/distribution/registry/storage/driver/cos/cdn"
+	"github.com/reedchan7/distribution/registry/storage/driver/factory"
+	"github.com/reedchan7/distribution/registry/storage/manager"
 )
 
 const (
@@ -859,7 +859,7 @@ func (d *driver) URLFor(ctx context.Context, path string, options map[string]int
 	method, ok := options["method"]
 	if ok {
 		methodString, ok = method.(string)
-		// FIXME: https://github.com/juan-chan/distribution/issues/2649
+		// FIXME: https://github.com/reedchan7/distribution/issues/2649
 		// ignore HEAD method
 		if !ok || (methodString != "GET") {
 			return "", storagedriver.ErrUnsupportedMethod{}

@@ -3,9 +3,9 @@ package cache
 import (
 	"context"
 
-	"github.com/juan-chan/distribution"
-	prometheus "github.com/juan-chan/distribution/metrics"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	prometheus "github.com/reedchan7/distribution/metrics"
 )
 
 // Metrics is used to hold metric counters

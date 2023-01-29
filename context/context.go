@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/juan-chan/distribution/uuid"
+	"github.com/reedchan7/distribution/uuid"
 )
 
 // instanceContext is a context that provides only an instance id. It is
@@ -21,7 +21,7 @@ func (ic *instanceContext) Value(key interface{}) interface{} {
 			// We want to lazy initialize the UUID such that we don't
 			// call a random generator from the package initialization
 			// code. For various reasons random could not be available
-			// https://github.com/juan-chan/distribution/issues/782
+			// https://github.com/reedchan7/distribution/issues/782
 			ic.id = uuid.Generate().String()
 		})
 		return ic.id

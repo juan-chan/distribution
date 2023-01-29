@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
-	"github.com/juan-chan/distribution/registry/storage/driver/testsuites"
+	storagedriver "github.com/reedchan7/distribution/registry/storage/driver"
+	"github.com/reedchan7/distribution/registry/storage/driver/testsuites"
 	. "gopkg.in/check.v1"
 )
 

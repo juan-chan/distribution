@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/juan-chan/distribution"
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/reference"
-	"github.com/juan-chan/distribution/registry/proxy/scheduler"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/reference"
+	"github.com/reedchan7/distribution/registry/proxy/scheduler"
 )
 
 // todo(richardscothern): from cache control header or config
@@ -79,7 +79,7 @@ func (pms proxyManifestStore) Get(ctx context.Context, dgst digest.Digest, optio
 
 		pms.scheduler.AddManifest(repoBlob, repositoryTTL)
 		// Ensure the manifest blob is cleaned up
-		//pms.scheduler.AddBlob(blobRef, repositoryTTL)
+		// pms.scheduler.AddBlob(blobRef, repositoryTTL)
 
 	}
 

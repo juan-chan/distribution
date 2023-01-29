@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"sync"
 
-	prometheus "github.com/juan-chan/distribution/metrics"
-	events "github.com/docker/go-events"
+	"github.com/docker/go-events"
 	"github.com/docker/go-metrics"
+	prometheus "github.com/reedchan7/distribution/metrics"
 )
 
 var (

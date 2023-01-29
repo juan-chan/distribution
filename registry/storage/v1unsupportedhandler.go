@@ -3,8 +3,8 @@ package storage
 import (
 	"context"
 
-	"github.com/juan-chan/distribution"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
 )
 
 // signedManifestHandler is a ManifestHandler that unmarshals v1 manifests but

@@ -7,17 +7,17 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/configuration"
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/reference"
-	"github.com/juan-chan/distribution/registry/client"
-	"github.com/juan-chan/distribution/registry/client/auth"
-	"github.com/juan-chan/distribution/registry/client/auth/challenge"
-	"github.com/juan-chan/distribution/registry/client/transport"
-	"github.com/juan-chan/distribution/registry/proxy/scheduler"
-	"github.com/juan-chan/distribution/registry/storage"
-	"github.com/juan-chan/distribution/registry/storage/driver"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/configuration"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/reference"
+	"github.com/reedchan7/distribution/registry/client"
+	"github.com/reedchan7/distribution/registry/client/auth"
+	"github.com/reedchan7/distribution/registry/client/auth/challenge"
+	"github.com/reedchan7/distribution/registry/client/transport"
+	"github.com/reedchan7/distribution/registry/proxy/scheduler"
+	"github.com/reedchan7/distribution/registry/storage"
+	"github.com/reedchan7/distribution/registry/storage/driver"
 )
 
 // proxyingRegistry fetches content from a remote registry and caches it locally

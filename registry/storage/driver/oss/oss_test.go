@@ -1,5 +1,3 @@
-// +build include_oss
-
 package oss
 
 import (
@@ -9,9 +7,9 @@ import (
 	"testing"
 
 	alioss "github.com/denverdino/aliyungo/oss"
-	"github.com/juan-chan/distribution/context"
-	storagedriver "github.com/juan-chan/distribution/registry/storage/driver"
-	"github.com/juan-chan/distribution/registry/storage/driver/testsuites"
+	"github.com/reedchan7/distribution/context"
+	storagedriver "github.com/reedchan7/distribution/registry/storage/driver"
+	"github.com/reedchan7/distribution/registry/storage/driver/testsuites"
 	"gopkg.in/check.v1"
 )
 

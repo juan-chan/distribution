@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/juan-chan/distribution/configuration"
-	events "github.com/docker/go-events"
+	"github.com/docker/go-events"
+	"github.com/reedchan7/distribution/configuration"
 )
 
 // EndpointConfig covers the optional configuration parameters for an active

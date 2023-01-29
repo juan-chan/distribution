@@ -11,12 +11,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/reference"
-	"github.com/juan-chan/distribution/registry/storage/cache/memory"
-	"github.com/juan-chan/distribution/registry/storage/driver/testdriver"
-	"github.com/juan-chan/distribution/testutil"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/reference"
+	"github.com/reedchan7/distribution/registry/storage/cache/memory"
+	"github.com/reedchan7/distribution/registry/storage/driver/testdriver"
+	"github.com/reedchan7/distribution/testutil"
 )
 
 // TestWriteSeek tests that the current file size can be

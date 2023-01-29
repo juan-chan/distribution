@@ -14,13 +14,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juan-chan/distribution"
-	"github.com/juan-chan/distribution/reference"
-	v2 "github.com/juan-chan/distribution/registry/api/v2"
-	"github.com/juan-chan/distribution/registry/client/transport"
-	"github.com/juan-chan/distribution/registry/storage/cache"
-	"github.com/juan-chan/distribution/registry/storage/cache/memory"
 	"github.com/opencontainers/go-digest"
+	"github.com/reedchan7/distribution"
+	"github.com/reedchan7/distribution/reference"
+	v2 "github.com/reedchan7/distribution/registry/api/v2"
+	"github.com/reedchan7/distribution/registry/client/transport"
+	"github.com/reedchan7/distribution/registry/storage/cache"
+	"github.com/reedchan7/distribution/registry/storage/cache/memory"
 )
 
 // Registry provides an interface for calling Repositories, which returns a catalog of repositories.

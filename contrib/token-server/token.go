@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	dcontext "github.com/juan-chan/distribution/context"
-	"github.com/juan-chan/distribution/registry/auth"
-	"github.com/juan-chan/distribution/registry/auth/token"
 	"github.com/docker/libtrust"
+	dcontext "github.com/reedchan7/distribution/context"
+	"github.com/reedchan7/distribution/registry/auth"
+	"github.com/reedchan7/distribution/registry/auth/token"
 )
 
 // ResolveScopeSpecifiers converts a list of scope specifiers from a token
