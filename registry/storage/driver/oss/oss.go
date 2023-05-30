@@ -64,6 +64,7 @@ type DriverParameters struct {
 	Endpoint              string
 	EncryptionKeyID       string
 	StorageManagerAddress string
+	SkipBucketApi         bool
 }
 
 func init() {
@@ -196,6 +197,15 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 
 	storageManagerAddress := parameters["smaddress"]
 
+	skipbucketapiBool := true
+	skipbucketapi, ok := parameters["skipbucketapi"]
+	if ok {
+		skipbucketapiBool, ok = skipbucketapi.(bool)
+		if !ok {
+			return nil, fmt.Errorf("The skipbucketapi parameter should be a boolean")
+		}
+	}
+
 	params := DriverParameters{
 		AccessKeyID:           fmt.Sprint(accessKey),
 		AccessKeySecret:       fmt.Sprint(secretKey),
@@ -209,6 +219,7 @@ func FromParameters(parameters map[string]interface{}) (*Driver, error) {
 		Endpoint:              fmt.Sprint(endpoint),
 		EncryptionKeyID:       fmt.Sprint(encryptionKeyID),
 		StorageManagerAddress: fmt.Sprint(storageManagerAddress),
+		SkipBucketApi:         skipbucketapiBool,
 	}
 
 	return New(params)
@@ -225,10 +236,11 @@ func New(params DriverParameters) (*Driver, error) {
 
 	// Validate that the given credentials have at least read permissions in the
 	// given bucket scope.
-	if _, err := bucket.List(strings.TrimRight(params.RootDirectory, "/"), "", "", 1); err != nil {
-		return nil, err
+	if !params.SkipBucketApi {
+		if _, err := bucket.List(strings.TrimRight(params.RootDirectory, "/"), "", "", 1); err != nil {
+			return nil, err
+		}
 	}
-
 	// TODO(tg123): Currently multipart uploads have no timestamps, so this would be unwise
 	// if you initiated a new OSS client while another one is running on the same bucket.
 
